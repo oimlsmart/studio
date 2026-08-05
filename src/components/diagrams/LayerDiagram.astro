@@ -1,0 +1,161 @@
+---
+// ── LayerDiagram.astro ───────────────────────────────────────────────
+// Renders a stack of layered boxes connected by labeled arrows.
+// Used for pipeline / architecture / stack diagrams.
+//
+// Usage:
+//   <LayerDiagram
+//     layers={[
+//       { index: '01', title: 'Source data (YAML)', lines: ['data/<standard>/{standard,dimensions}.yaml', 'data/<standard>/{requirements,conformance,forms}/*.yaml'], note: 'Authored by subject-matter experts in version control.', accent: 'brand' },
+//       ...
+//     ]}
+//     arrows={['build pipeline', 'app runtime']}
+//   />
+
+interface Layer {
+  index?: string
+  title: string
+  lines?: string[]
+  note?: string
+  accent?: 'brand' | 'teal' | 'amber' | 'slate'
+}
+
+interface Props {
+  layers: Layer[]
+  arrows?: string[] // length should be layers.length - 1
+  class?: string
+}
+
+const { layers, arrows = [], class: className = '' } = Astro.props
+
+const accentMap: Record<string, { stroke: string; fill: string; text: string; chip: string }> = {
+  brand: { stroke: 'var(--color-brand-400)', fill: 'var(--color-brand-50)', text: 'var(--color-brand-700)', chip: 'var(--color-brand-600)' },
+  teal: { stroke: 'var(--color-teal-400)', fill: 'var(--color-teal-50)', text: 'var(--color-teal-700)', chip: 'var(--color-teal-600)' },
+  amber: { stroke: '#fbbf24', fill: '#fef3c7', text: '#92400e', chip: '#d97706' },
+  slate: { stroke: 'var(--color-rule)', fill: 'var(--color-paper-soft)', text: 'var(--color-ink-soft)', chip: 'var(--color-ink)' },
+}
+
+// SVG geometry
+const W = 720
+const padX = 24
+const boxH = 110
+const arrowH = 56
+const headerH = 28
+const totalH = headerH + layers.length * boxH + (layers.length - 1) * arrowH + 24
+---
+
+<figure class={`layer-diagram ${className}`}>
+  <svg viewBox={`0 0 ${W} ${totalH}`} xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="layer-diagram-title">
+    <title id="layer-diagram-title">Layered architecture</title>
+    {/* Top ruler */}
+    <line x1={padX} y1={14} x2={W - padX} y2={14} stroke="var(--color-rule)" stroke-width="1" />
+    {Array.from({ length: Math.floor((W - padX * 2) / 32) + 1 }).map((_, i) => (
+      <line x1={padX + i * 32} y1={14} y2={i % 4 === 0 ? 20 : 17} stroke="var(--bp-tick-color-strong, var(--color-rule))" stroke-width="1" />
+    ))}
+    <text x={padX} y={36} font-family="var(--font-mono)" font-size="10" letter-spacing="0.12em" fill="var(--color-ink-muted)">FIG. ARCHITECTURE</text>
+    <text x={W - padX} y={36} text-anchor="end" font-family="var(--font-mono)" font-size="10" letter-spacing="0.12em" fill="var(--color-ink-muted)">{layers.length} LAYERS</text>
+
+    {layers.map((layer, i) => {
+      const y = headerH + i * (boxH + arrowH)
+      const accent = accentMap[layer.accent || 'slate'] || accentMap.slate
+      const idx = layer.index || String(i + 1).padStart(2, '0')
+      return (
+        <g>
+          {/* Corner crosshairs */}
+          <path d={`M ${padX} ${y + 8} h 8 M ${padX} ${y + 8} v 8`} stroke={accent.stroke} stroke-width="1.5" fill="none" />
+          <path d={`M ${W - padX - 8} ${y + boxH - 8} h 8 M ${W - padX} ${y + boxH - 8} v -8`} stroke={accent.stroke} stroke-width="1.5" fill="none" />
+
+          {/* Main box */}
+          <rect
+            x={padX}
+            y={y + 8}
+            width={W - padX * 2}
+            height={boxH - 16}
+            fill={accent.fill}
+            stroke={accent.stroke}
+            stroke-width="1"
+            rx="2"
+          />
+          {/* Left accent stripe */}
+          <rect x={padX} y={y + 8} width="3" height={boxH - 16} fill={accent.chip} />
+
+          {/* Layer index chip */}
+          <rect x={padX + 14} y={y + 18} width="36" height="18" fill={accent.chip} rx="1" />
+          <text x={padX + 32} y={y + 30} text-anchor="middle" font-family="var(--font-mono)" font-size="10" font-weight="600" fill="white" letter-spacing="0.08em">L{idx}</text>
+
+          {/* Title */}
+          <text x={padX + 60} y={y + 31} font-family="var(--font-serif)" font-size="16" font-weight="600" fill="var(--color-ink)">{layer.title}</text>
+
+          {/* Body lines */}
+          {(layer.lines || []).map((line, li) => (
+            <text x={padX + 60} y={y + 52 + li * 15} font-family="var(--font-mono)" font-size="11" fill="var(--color-ink-soft)">{line}</text>
+          ))}
+
+          {/* Note */}
+          {layer.note && (
+            <text x={padX + 60} y={y + boxH - 18} font-family="var(--font-sans)" font-size="11" font-style="italic" fill="var(--color-ink-muted)">{layer.note}</text>
+          )}
+
+          {/* Arrow to next layer */}
+          {i < layers.length - 1 && (
+            <g>
+              <line
+                x1={W / 2}
+                y1={y + boxH + 6}
+                x2={W / 2}
+                y2={y + boxH + arrowH - 14}
+                stroke={accent.chip}
+                stroke-width="1.5"
+                stroke-dasharray="3 3"
+              />
+              <polygon
+                points={`${W / 2 - 5},${y + boxH + arrowH - 18} ${W / 2 + 5},${y + boxH + arrowH - 18} ${W / 2},${y + boxH + arrowH - 10}`}
+                fill={accent.chip}
+              />
+              {arrows[i] && (
+                <text x={W / 2 + 14} y={y + boxH + arrowH / 2 + 4} font-family="var(--font-mono)" font-size="11" font-weight="500" fill="var(--color-ink-muted)" letter-spacing="0.08em">{arrows[i]}</text>
+              )}
+            </g>
+          )}
+        </g>
+      )
+    })}
+  </svg>
+</figure>
+
+<style>
+  .layer-diagram {
+    margin: 2rem 0;
+    padding: 1rem;
+    background: var(--color-paper);
+    border: 1px solid var(--color-rule);
+    border-radius: var(--bp-radius, 4px);
+    position: relative;
+    overflow: hidden;
+  }
+  .layer-diagram::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(to right, var(--color-grid-line) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--color-grid-line) 1px, transparent 1px);
+    background-size: 16px 16px;
+    opacity: 0.6;
+    z-index: 0;
+  }
+  .layer-diagram svg {
+    position: relative;
+    z-index: 1;
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .layer-diagram text {
+    font-family: inherit;
+  }
+  :global(.dark) .layer-diagram {
+    background: var(--color-paper-soft);
+  }
+</style>

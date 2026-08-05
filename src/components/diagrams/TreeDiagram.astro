@@ -1,0 +1,208 @@
+---
+// ── TreeDiagram.astro ────────────────────────────────────────────────
+// Renders hierarchical tree structures (file trees, entity relationships,
+// AST-like diagrams) as styled SVG.
+//
+// Each node has: label, optional annotation (the parenthetical or
+// comment-style aside), depth, kind (root|branch|leaf), and an optional
+// type tag. Children render indented under their parent with the standard
+// ├── / └── connector glyphs.
+//
+// Usage:
+//   <TreeDiagram
+//     caption="Standard data layout"
+//     accent="brand"
+//     nodes={[
+//       { label: 'data/oiml-r60/', kind: 'root', children: [
+//         { label: 'standard.yaml', annotation: 'identity, value model' },
+//         { label: 'requirements/', kind: 'branch', children: [
+//           { label: 'metrological.yaml', annotation: 'individual requirements' },
+//         ]},
+//       ]},
+//     ]}
+//   />
+
+interface TreeNode {
+  label: string
+  annotation?: string
+  type?: string
+  kind?: 'root' | 'branch' | 'leaf'
+  accent?: 'brand' | 'teal' | 'amber' | 'slate'
+  children?: TreeNode[]
+}
+
+interface Props {
+  nodes: TreeNode[]
+  caption?: string
+  accent?: 'brand' | 'teal' | 'amber' | 'slate'
+  class?: string
+}
+
+const { nodes, caption, accent = 'slate', class: className = '' } = Astro.props
+
+const accentMap: Record<string, { stroke: string; text: string; chip: string; tag: string }> = {
+  brand: { stroke: 'var(--color-brand-400)', text: 'var(--color-brand-700)', chip: 'var(--color-brand-50)', tag: 'var(--color-brand-600)' },
+  teal: { stroke: 'var(--color-teal-400)', text: 'var(--color-teal-700)', chip: 'var(--color-teal-50)', tag: 'var(--color-teal-600)' },
+  amber: { stroke: '#fbbf24', text: '#92400e', chip: '#fef3c7', tag: '#d97706' },
+  slate: { stroke: 'var(--color-rule)', text: 'var(--color-ink-soft)', chip: 'var(--color-paper-soft)', tag: 'var(--color-ink-muted)' },
+}
+
+const rootAccent = accentMap[accent] || accentMap.slate
+
+// Flatten the tree into rows with depth + connector info.
+interface Row {
+  x: number
+  y: number
+  label: string
+  annotation?: string
+  type?: string
+  kind: string
+  isLast: boolean
+  accent: typeof rootAccent
+  verticalLines: { x: number; y1: number; y2: number }[]
+  horizontalLine?: { x1: number; x2: number; y: number }
+}
+
+const ROW_H = 22
+const INDENT = 24
+const PAD_X = 28
+const PAD_TOP = 56
+const PAD_BOTTOM = 24
+const baseFontSize = 12
+
+// Compute total rows to size the SVG
+function countRows(list: TreeNode[]): number {
+  return list.reduce((sum, n) => sum + 1 + (n.children ? countRows(n.children) : 0), 0)
+}
+const totalRows = countRows(nodes)
+
+// Estimate max text width per row
+function labelWidth(n: TreeNode): number {
+  const l = (n.label.length + (n.annotation ? n.annotation.length + 3 : 0) + (n.type ? n.type.length + 2 : 0)) * baseFontSize * 0.62
+  return Math.max(l, 200)
+}
+function maxRowWidth(list: TreeNode[], depth = 0): number {
+  return Math.max(...list.map((n) => depth * INDENT + labelWidth(n) + (n.children ? maxRowWidth(n.children, depth + 1) : 0)))
+}
+const W = Math.max(maxRowWidth(nodes) + PAD_X * 2, 600)
+const H = PAD_TOP + totalRows * ROW_H + PAD_BOTTOM + (caption ? 28 : 0)
+
+const rows: Row[] = []
+let cursor = 0
+
+function walk(list: TreeNode[], depth: number, parentIsLast: boolean[], parentAccent: typeof rootAccent) {
+  list.forEach((node, i) => {
+    const isLast = i === list.length - 1
+    const y = PAD_TOP + cursor * ROW_H + ROW_H / 2
+    const x = PAD_X + depth * INDENT
+    const nodeAccent = node.accent ? accentMap[node.accent] : parentAccent
+    const vlines: { x: number; y1: number; y2: number }[] = []
+    parentIsLast.forEach((wasLast, di) => {
+      if (!wasLast) {
+        vlines.push({ x: PAD_X + (di + 1) * INDENT, y1: PAD_TOP + (cursor - 0.5) * ROW_H, y2: PAD_TOP + (cursor + 0.5) * ROW_H })
+      }
+    })
+    const hline = depth > 0 ? { x1: PAD_X + (depth - 1) * INDENT, x2: x, y } : undefined
+    rows.push({
+      x,
+      y,
+      label: node.label,
+      annotation: node.annotation,
+      type: node.type,
+      kind: node.kind || (node.children ? 'branch' : 'leaf'),
+      isLast,
+      accent: nodeAccent,
+      verticalLines: vlines,
+      horizontalLine: hline,
+    })
+    cursor++
+    if (node.children && node.children.length > 0) {
+      walk(node.children, depth + 1, [...parentIsLast, isLast], nodeAccent)
+    }
+  })
+}
+walk(nodes, 0, [], rootAccent)
+---
+
+<figure class={`tree-diagram ${className}`}>
+  <svg viewBox={`0 0 ${W} ${H}`} xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="tree-title">
+    <title id="tree-title">{caption || 'Tree diagram'}</title>
+
+    {/* Top ruler */}
+    <line x1={PAD_X} y1={14} x2={W - PAD_X} y2={14} stroke="var(--color-rule)" stroke-width="1" />
+    {Array.from({ length: Math.floor((W - PAD_X * 2) / 32) + 1 }).map((_, i) => (
+      <line x1={PAD_X + i * 32} y1={14} y2={i % 4 === 0 ? 20 : 17} stroke="var(--bp-tick-color-strong, var(--color-rule))" stroke-width="1" />
+    ))}
+    <text x={PAD_X} y={36} font-family="var(--font-mono)" font-size="10" letter-spacing="0.12em" fill="var(--color-ink-muted)">{caption || 'FIG. TREE'}</text>
+    <text x={W - PAD_X} y={36} text-anchor="end" font-family="var(--font-mono)" font-size="10" letter-spacing="0.12em" fill="var(--color-ink-muted)">{totalRows} NODES</text>
+
+    {/* Tree connectors */}
+    {rows.map((row) => (
+      <g>
+        {row.verticalLines.map((vl) => (
+          <line x1={vl.x} y1={vl.y1} x2={vl.x} y2={vl.y2} stroke={row.accent.stroke} stroke-width="1" opacity="0.6" />
+        ))}
+        {row.horizontalLine && (
+          <line x1={row.horizontalLine.x1} y1={row.horizontalLine.y} x2={row.horizontalLine.x2} y2={row.horizontalLine.y} stroke={row.accent.stroke} stroke-width="1" opacity="0.6" />
+        )}
+        {/* Node dot */}
+        <circle cx={row.x - 4} cy={row.y} r={row.kind === 'root' ? 3 : 2} fill={row.accent.tag} />
+      </g>
+    ))}
+
+    {/* Node labels */}
+    {rows.map((row) => (
+      <g>
+        <text x={row.x + 6} y={row.y + 4} font-family={row.kind === 'root' ? 'var(--font-mono)' : 'var(--font-mono)'} font-size={baseFontSize} font-weight={row.kind === 'root' ? '600' : '400'} fill={row.kind === 'root' ? row.accent.text : 'var(--color-ink)'}>{row.label}</text>
+        {row.type && (
+          <g>
+            <rect x={row.x + 6 + row.label.length * baseFontSize * 0.62 + 6} y={row.y - 7} width={row.type.length * 7 + 8} height="14" fill={row.accent.chip} stroke={row.accent.stroke} rx="1" />
+            <text x={row.x + 6 + row.label.length * baseFontSize * 0.62 + 10} y={row.y + 4} font-family="var(--font-mono)" font-size="9" font-weight="600" fill={row.accent.tag}>{row.type.toUpperCase()}</text>
+          </g>
+        )}
+        {row.annotation && (
+          <text x={row.x + 6 + row.label.length * baseFontSize * 0.62 + (row.type ? row.type.length * 7 + 18 : 8)} y={row.y + 4} font-family="var(--font-sans)" font-size="11" font-style="italic" fill="var(--color-ink-muted)">{row.annotation}</text>
+        )}
+      </g>
+    ))}
+
+    {/* Bottom corner */}
+    <line x1={PAD_X} y1={H - PAD_BOTTOM / 2} x2={PAD_X + 24} y2={H - PAD_BOTTOM / 2} stroke="var(--color-rule)" stroke-width="1" />
+    <line x1={W - PAD_X - 24} y1={H - PAD_BOTTOM / 2} x2={W - PAD_X} y2={H - PAD_BOTTOM / 2} stroke="var(--color-rule)" stroke-width="1" />
+    <text x={W / 2} y={H - PAD_BOTTOM / 2 + 4} text-anchor="middle" font-family="var(--font-mono)" font-size="9" letter-spacing="0.1em" fill="var(--color-ink-muted)">END · {totalRows} NODES</text>
+  </svg>
+</figure>
+
+<style>
+  .tree-diagram {
+    margin: 2rem 0;
+    padding: 1rem;
+    background: var(--color-paper);
+    border: 1px solid var(--color-rule);
+    border-radius: var(--bp-radius, 4px);
+    position: relative;
+    overflow: hidden;
+  }
+  .tree-diagram::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(to right, var(--color-grid-line) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--color-grid-line) 1px, transparent 1px);
+    background-size: 16px 16px;
+    opacity: 0.5;
+    z-index: 0;
+  }
+  .tree-diagram svg {
+    position: relative;
+    z-index: 1;
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  :global(.dark) .tree-diagram {
+    background: var(--color-paper-soft);
+  }
+</style>

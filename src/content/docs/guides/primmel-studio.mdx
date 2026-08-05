@@ -1,0 +1,48 @@
+---
+title: 'Primmel Studio'
+shortTitle: 'Primmel Studio'
+description: 'Author an OIML SMART Recommendation with Primmel Studio: the canvas and inspectors, the subject anatomy, requirements with clause URNs, conformance tests, the doc map, and the certificate preview, the authoring half of the SMART toolchain.'
+eyebrow: 'Guide · 14 of 14'
+---
+
+## The authoring half of the toolchain
+
+Everything else in these guides is the runtime: source data → generated modules → evaluation → certificates. **Primmel Studio** is how the models themselves get written, the browser application for creating, editing, mapping, reviewing, and validating `.prl` packages, with OIML SMART as its first program layer.
+
+The repository is [`primmel/editor`](https://github.com/primmel/editor); the full manual is its [user guide](https://github.com/primmel/editor/tree/main/docs) (audience-organized, with diagrams for every surface). The architecture chapter is [21, Primmel Studio](https://github.com/oimlsmart/smart/blob/main/docs/architecture/21-primmel-studio.md).
+
+## The OIML program layer
+
+Open a model carrying OIML-CS content and the Studio activates the program plugin, never a kernel branch:
+
+- **The rec palettes**, Requirement, Conformance test, Form, and Instrument (subject) creation, each with the parser's own minimal shape.
+- **The certificate preview**, the subject's IS/HAS facets rendered as certificate-style tables (identity, design parameters with the MPE table, attributes, promises).
+- **The doctrine stays the kernel's**, the coverage calculus, the type vocabulary, model-diff all come from `@primmel/primmel`; the Studio bridges, never reimplements.
+
+## Author a Recommendation: the seven-step loop
+
+The worked tutorial is OIML R 7 (1979), Clinical thermometers, shipped in the Studio repo at `demo/r7-clinical-thermometer/` with the full [TUTORIAL.md](https://github.com/primmel/editor/blob/main/demo/r7-clinical-thermometer/TUTORIAL.md). The loop:
+
+1. **Read the document like a modeller**, instrument / truths / checks / verdict (the IS-HAS-DOES read).
+2. **Open the model**, the plugin activates; the Program palette and Certificate preview appear.
+3. **The subject anatomy**, IS identity + design parameters, HAS attributes + characteristics, DOES behaviors.
+4. **Requirements with provenance**, each a constraint on the subject, each carrying its clause URN (`source: { doc: urn:oiml:pub:r:7:1979, clause: "…" }`).
+5. **Conformance tests and forms**, preconditions, procedures, acceptance rules; the form as the evidence skeleton.
+6. **The workflow, simulated**, the clause-8 ambient gate and the MPE gate, walked live with registers (conform / invalid ambient / out-of-MPE).
+7. **The doc map + review + save**, the model mapped back onto the document's statements; the kernel's model-diff as review-before-commit.
+
+The assessment gate is machine-checkable:
+
+```bash
+cd ~/src/primmel/editor
+npx vitest run src/lib/__tests__/r7-tutorial.test.ts   # 6 tests
+npx tsx e2e/r7-smoke.ts                                 # the live loop
+```
+
+## The dual demo
+
+Pair it with the [r60 classroom](https://github.com/oimlsmart/smart-r60): r60 teaches the methodology (six levels, live twin); the R 7 tutorial proves you can apply it to a document you have never modelled. The federation volume carries the full story at [Tier 5, the dual demo](https://primmel.github.io/primmel-smart-docs/learn/05-the-dual-demo/).
+
+## The review discipline
+
+The Studio's rule is the platform's rule: **never write a change you haven't reviewed.** The save review carries the validation verdict and the kernel's change diff before anything is written; the dirty flag is exact (history cursor ≠ saved cursor); and the validation badge is always on, the topbar, the Validate tab, the editor markers, the import report, the save review are one surface.
