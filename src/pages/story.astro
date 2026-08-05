@@ -1,0 +1,31 @@
+---
+import { Base, MinisiteNav } from '@oimlsmart/site-shell'
+import '../styles/app.css'
+
+const NAV = [
+  { label: 'About', href: '/' },
+  { label: 'Story', href: '/story' },
+  { label: 'Docs', href: '/docs' },
+  { label: 'Demo', href: '/demo' },
+]
+---
+
+<Base title="The story" description="From the MMEL editor to Primmel Studio.">
+  <MinisiteNav sections={NAV} base="/studio" />
+  <main class="max-w-3xl mx-auto px-6 py-14 docs-body">
+    <p class="font-mono text-xs tracking-widest uppercase text-ink-muted mb-3">SMART Studio · Story</p>
+    <h1 class="font-serif text-3xl font-semibold text-ink mb-6">From the MMEL editor to Primmel Studio</h1>
+
+    <p>The first SMART authoring tool was the MMEL editor, viewer, and mapper: a reference implementation that let a standards expert draw a model of a document, connect its processes, and map one model against another. It proved the method — that a standard could be authored as a model and the model could carry the meaning — and its plugin pilots carried real standards bodies' workflows.</p>
+
+    <p>SMART Studio is that method on the Primmel language. The model is the artifact: a Recommendation authored in Studio packages as data with provenance, validated by the same engine that later executes it in the certification platform. What changed from the MMEL era is not the idea but the discipline around it — one language, one validator, one source of truth, and every element citable to its clause.</p>
+
+    <h2>Reference and implementation models</h2>
+    <p>Studio works in layers. A reference model states what a standard says (the Recommendation, abstract and authoritative). An implementation model states what one organization does (a laboratory's own process, mapped onto the reference). Studio edits both, and the mappings between them: an implementation can satisfy many reference models at once, and a complex implementation can be viewed through a single standard's lens.</p>
+
+    <h2>Who works in it</h2>
+    <p>The OIML technical committees author SMART Recommendations here. Laboratories model their own test processes and map them onto the Recommendations. And manufacturers model their instruments — the subject every Recommendation constrains.</p>
+
+    <p class="mt-8"><a href="/studio/docs/" class="text-accent font-medium">The Studio guides walk each surface →</a></p>
+  </main>
+</Base>

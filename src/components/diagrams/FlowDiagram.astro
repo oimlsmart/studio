@@ -1,0 +1,165 @@
+---
+// ── FlowDiagram.astro ────────────────────────────────────────────────
+// Renders a left-to-right flow with labeled arrows between actors/phases.
+// Used for swimlane-style workflow diagrams (e.g. certification flow).
+//
+// Usage:
+//   <FlowDiagram
+//     caption="Certification flow"
+//     steps={[
+//       { label: 'Manufacturer', sub: 'Applicant', accent: 'amber' },
+//       { label: 'Issuing Authority', sub: 'Decision-maker', accent: 'brand' },
+//       { label: 'Testing Laboratory', sub: 'Independent test', accent: 'teal' },
+//     ]}
+//     arrows={[
+//       { label: 'Application', detail: 'family, groups, models, samples', direction: 'forward' },
+//       { label: 'Test Request', detail: 'samples, scope, procedures', direction: 'forward' },
+//     ]}
+//   />
+
+interface Step {
+  label: string
+  sub?: string
+  accent?: 'brand' | 'teal' | 'amber' | 'slate'
+}
+
+interface Arrow {
+  label: string
+  detail?: string
+  direction?: 'forward' | 'back' | 'bidirectional'
+}
+
+interface Props {
+  steps: Step[]
+  arrows?: Arrow[]
+  caption?: string
+  class?: string
+}
+
+const { steps, arrows = [], caption, class: className = '' } = Astro.props
+
+const accentMap: Record<string, { stroke: string; fill: string; text: string; chip: string }> = {
+  brand: { stroke: 'var(--color-brand-400)', fill: 'var(--color-brand-50)', text: 'var(--color-brand-700)', chip: 'var(--color-brand-600)' },
+  teal: { stroke: 'var(--color-teal-400)', fill: 'var(--color-teal-50)', text: 'var(--color-teal-700)', chip: 'var(--color-teal-600)' },
+  amber: { stroke: '#fbbf24', fill: '#fef3c7', text: '#92400e', chip: '#d97706' },
+  slate: { stroke: 'var(--color-rule)', fill: 'var(--color-paper-soft)', text: 'var(--color-ink-soft)', chip: 'var(--color-ink)' },
+}
+
+const stepW = 180
+const stepH = 96
+const arrowW = 110
+const padX = 28
+const padTop = 56
+const padBottom = 32
+const W = padX * 2 + steps.length * stepW + Math.max(0, steps.length - 1) * arrowW
+const H = padTop + stepH + padBottom
+---
+
+<figure class={`flow-diagram ${className}`}>
+  <svg viewBox={`0 0 ${W} ${H}`} xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="flow-title">
+    <title id="flow-title">{caption || 'Flow diagram'}</title>
+
+    <line x1={padX} y1={14} x2={W - padX} y2={14} stroke="var(--color-rule)" stroke-width="1" />
+    {Array.from({ length: Math.floor((W - padX * 2) / 32) + 1 }).map((_, i) => (
+      <line x1={padX + i * 32} y1={14} y2={i % 4 === 0 ? 20 : 17} stroke="var(--bp-tick-color-strong, var(--color-rule))" stroke-width="1" />
+    ))}
+    <text x={padX} y={36} font-family="var(--font-mono)" font-size="10" letter-spacing="0.12em" fill="var(--color-ink-muted)">{caption || 'FIG. FLOW'}</text>
+    <text x={W - padX} y={36} text-anchor="end" font-family="var(--font-mono)" font-size="10" letter-spacing="0.12em" fill="var(--color-ink-muted)">{steps.length} ACTORS</text>
+
+    {steps.map((step, i) => {
+      const x = padX + i * (stepW + arrowW)
+      const y = padTop
+      const accent = accentMap[step.accent || 'slate'] || accentMap.slate
+      const idx = String(i + 1).padStart(2, '0')
+      return (
+        <g>
+          {/* Crosshair corners */}
+          <path d={`M ${x} ${y} h 6 M ${x} ${y} v 6`} stroke={accent.stroke} stroke-width="1.5" fill="none" />
+          <path d={`M ${x + stepW - 6} ${y} h 6 M ${x + stepW} ${y} v 6`} stroke={accent.stroke} stroke-width="1.5" fill="none" />
+          <path d={`M ${x} ${y + stepH - 6} v 6 M ${x} ${y + stepH} h 6`} stroke={accent.stroke} stroke-width="1.5" fill="none" />
+          <path d={`M ${x + stepW} ${y + stepH - 6} v 6 M ${x + stepW - 6} ${y + stepH} h 6`} stroke={accent.stroke} stroke-width="1.5" fill="none" />
+
+          {/* Box */}
+          <rect x={x} y={y} width={stepW} height={stepH} fill={accent.fill} stroke={accent.stroke} stroke-width="1" rx="2" />
+          <rect x={x} y={y} width={stepW} height="3" fill={accent.chip} />
+
+          {/* Index */}
+          <text x={x + 12} y={y + 20} font-family="var(--font-mono)" font-size="10" font-weight="600" fill={accent.chip} letter-spacing="0.08em">STEP {idx}</text>
+
+          {/* Label */}
+          <text x={x + stepW / 2} y={y + 48} text-anchor="middle" font-family="var(--font-serif)" font-size="14" font-weight="600" fill="var(--color-ink)">{step.label}</text>
+          {step.sub && (
+            <text x={x + stepW / 2} y={y + 68} text-anchor="middle" font-family="var(--font-sans)" font-size="10" fill={accent.text}>{step.sub}</text>
+          )}
+
+          {/* Arrow */}
+          {i < steps.length - 1 && (
+            (() => {
+              const arrow = arrows[i] || { label: '', direction: 'forward' }
+              const ax1 = x + stepW + 8
+              const ax2 = x + stepW + arrowW - 8
+              const ay = y + stepH / 2
+              const dir = arrow.direction || 'forward'
+              return (
+                <g>
+                  <line
+                    x1={dir === 'back' ? ax2 : ax1}
+                    y1={ay}
+                    x2={dir === 'back' ? ax1 : ax2}
+                    y2={ay}
+                    stroke={accent.chip}
+                    stroke-width="1.5"
+                    stroke-dasharray={dir === 'bidirectional' ? '4 3' : '0'}
+                  />
+                  <polygon
+                    points={`${ax2 - 6},${ay - 4} ${ax2 - 6},${ay + 4} ${ax2},${ay}`}
+                    fill={accent.chip}
+                    transform={dir === 'back' ? `translate(${ax2 + ax1 - 6}, 0) scale(-1, 1)` : ''}
+                  />
+                  {arrow.label && (
+                    <text x={(ax1 + ax2) / 2} y={ay - 8} text-anchor="middle" font-family="var(--font-mono)" font-size="10" font-weight="500" fill="var(--color-ink)" letter-spacing="0.06em">{arrow.label}</text>
+                  )}
+                  {arrow.detail && (
+                    <text x={(ax1 + ax2) / 2} y={ay + 16} text-anchor="middle" font-family="var(--font-sans)" font-size="9" fill="var(--color-ink-muted)">{arrow.detail}</text>
+                  )}
+                </g>
+              )
+            })()
+          )}
+        </g>
+      )
+    })}
+  </svg>
+</figure>
+
+<style>
+  .flow-diagram {
+    margin: 2rem 0;
+    padding: 1rem;
+    background: var(--color-paper);
+    border: 1px solid var(--color-rule);
+    border-radius: var(--bp-radius, 4px);
+    position: relative;
+    overflow: hidden;
+  }
+  .flow-diagram::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(to right, var(--color-grid-line) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--color-grid-line) 1px, transparent 1px);
+    background-size: 16px 16px;
+    opacity: 0.5;
+    z-index: 0;
+  }
+  .flow-diagram svg {
+    position: relative;
+    z-index: 1;
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  :global(.dark) .flow-diagram { background: var(--color-paper-soft); }
+</style>

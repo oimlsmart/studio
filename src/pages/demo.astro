@@ -1,0 +1,38 @@
+---
+import { Base, MinisiteNav } from '@oimlsmart/site-shell'
+import '../styles/app.css'
+
+const NAV = [
+  { label: 'About', href: '/' },
+  { label: 'Story', href: '/story' },
+  { label: 'Docs', href: '/docs' },
+  { label: 'Demo', href: '/demo' },
+]
+---
+
+<Base title="The Studio demo" description="Author a SMART Recommendation, step by step.">
+  <MinisiteNav sections={NAV} base="/studio" />
+  <main class="max-w-3xl mx-auto px-6 py-14 docs-body">
+    <p class="font-mono text-xs tracking-widest uppercase text-ink-muted mb-3">SMART Studio · Demo</p>
+    <h1 class="font-serif text-3xl font-semibold text-ink mb-6">The Studio demo</h1>
+
+    <p>The Studio editor today lives in the OIML SMART platform application (the private deployment the technical committees use). This page is the honest pointer: what the editor does, and where its walkthrough lives, rather than a fake embed.</p>
+
+    <h2>The authoring walkthrough</h2>
+    <p>The end-to-end path, from an empty package to a validated Recommendation model:</p>
+    <ul>
+      <li><strong>Getting started</strong> — the Studio surface and the package layout.</li>
+      <li><strong>Directory structure</strong> — where subjects, processes, forms, and provenance live.</li>
+      <li><strong>Identity and dimensions</strong> — how a subject is individuated and classified.</li>
+      <li><strong>Requirements and conformance tests</strong> — constraints on the subject, and the procedures that probe them.</li>
+      <li><strong>Test report forms</strong> — the evidence interface of every test.</li>
+      <li><strong>The calculation engine</strong> — OCL over the model: derived values, evaluations, verdicts.</li>
+      <li><strong>The evaluation workflow</strong> — from test reports to the determination of conformity.</li>
+    </ul>
+
+    <p>Each is a chapter in <a href="/studio/docs/" class="text-accent">the Studio guides</a>. The recommended first read is <a href="/studio/docs/guides/getting-started" class="text-accent">Getting started</a>, then <a href="/studio/docs/guides/primmel-studio" class="text-accent">the Primmel Studio chapter</a>.</p>
+
+    <h2>The public surface today</h2>
+    <p>The authored results are public even where the editor is not: the <a href="https://www.oimlsmart.org/recs/" class="text-accent">SMART Recommendations</a> published from Studio, and the <a href="https://www.oimlsmart.org/sst/" class="text-accent">simulated instruments</a> the models drive.</p>
+  </main>
+</Base>
