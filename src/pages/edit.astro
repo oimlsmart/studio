@@ -1,0 +1,37 @@
+---
+import { Base, MinisiteNav } from '@oimlsmart/site-shell'
+import '../styles/app.css'
+
+const NAV = [
+  { label: 'About', href: '/' },
+  { label: 'Story', href: '/story' },
+  { label: 'Docs', href: '/docs' },
+  { label: 'Studio', href: '/edit' },
+]
+---
+
+<Base title="SMART Studio — the editor" description="The canvas where an expert models an OIML SMART Recommendation.">
+  <MinisiteNav sections={NAV} base="/studio" />
+  <div id="editor-root"></div>
+  <script type="module">
+    import { mount } from '@primmel/editor'
+    const params = new URLSearchParams(location.search)
+    const model = params.get('model') || '/studio/models/load-cell-evaluation-report.prl'
+    let initialText
+    try {
+      const res = await fetch(model)
+      if (res.ok) initialText = await res.text()
+      else console.warn('Model fetch returned', res.status, model)
+    } catch (e) {
+      console.error('Failed to load model', model, e)
+    }
+    mount(document.getElementById('editor-root'), {
+      initialText,
+      brand: {
+        name: 'OIML SMART',
+        sub: 'STUDIO',
+        logoUrl: '/img/components/smart-studio-light.svg',
+      },
+    })
+  </script>
+</Base>
