@@ -31,3 +31,49 @@ jobs:
           code=$(curl -s -o /dev/null -w '%{http_code}' -L "$url")
           echo "canonical logo: $url → HTTP $code"
           [ "$code" = "200" ]
+
+  smoke:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout the shell package (the chrome SSOT)
+        uses: actions/checkout@v4
+        with:
+          repository: oimlsmart/site-shell
+          path: vendor/site-shell
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm run build
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Start preview server
+        run: npm run preview & echo $! > /tmp/preview.pid
+        env:
+          ASTRO_PORT: '4322'
+
+      - name: Wait for preview to be ready
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fs http://localhost:4322/studio/ > /dev/null; then
+              echo "preview ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "preview did not become ready"
+          exit 1
+
+      - name: Smoke-test /studio/edit
+        run: node scripts/smoke-edit.mjs
+        env:
+          BASE_URL: http://localhost:4322
+
+      - name: Stop preview
+        if: always()
+        run: kill $(cat /tmp/preview.pid) 2>/dev/null || true
