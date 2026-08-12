@@ -25,6 +25,13 @@ const NAV = [
     } catch (e) {
       console.error('Failed to load model', model, e)
     }
-    mount(document.getElementById('editor-root'), { initialText })
+    mount(document.getElementById('editor-root'), {
+      initialText,
+      brand: {
+        name: 'OIML SMART',
+        sub: 'STUDIO',
+        logoUrl: '/img/components/smart-studio-light.svg',
+      },
+    })
   </script>
 </Base>
