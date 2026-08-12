@@ -10,9 +10,9 @@
   },
   "dependencies": {
     "@oimlsmart/site-shell": "file:vendor/site-shell",
-    "@primmel/editor": "file:vendor/editor",
+    "@primmel/editor": "^0.2.0",
     "@oimlsmart/oiml-pubid": "github:oimlsmart/oiml-pubid#main",
-    "@primmel/primmel": "file:../../primmel/primmel-ts/packages/primmel",
+    "@primmel/primmel": "^1.5.3",
     "astro": "^7.0.7",
     "@astrojs/mdx": "^7.0.2",
     "@astrojs/vue": "^7.0.0",
