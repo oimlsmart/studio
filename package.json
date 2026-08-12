@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@oimlsmart/site-shell": "file:vendor/site-shell",
-    "@primmel/editor": "^0.2.0",
+    "@primmel/editor": "^0.3.2",
     "@oimlsmart/oiml-pubid": "github:oimlsmart/oiml-pubid#main",
     "@primmel/primmel": "^1.5.3",
     "astro": "^7.0.7",

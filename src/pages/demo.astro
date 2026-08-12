@@ -6,33 +6,32 @@ const NAV = [
   { label: 'About', href: '/' },
   { label: 'Story', href: '/story' },
   { label: 'Docs', href: '/docs' },
-  { label: 'Demo', href: '/demo' },
+  { label: 'Studio', href: '/edit' },
 ]
 ---
 
-<Base title="The Studio demo" description="Author a SMART Recommendation, step by step.">
+<Base title="SMART Studio — demo" description="The SMART Studio editor mounts a model canvas at /studio/edit.">
   <MinisiteNav sections={NAV} base="/studio" />
   <main class="max-w-3xl mx-auto px-6 py-14 docs-body">
     <p class="font-mono text-xs tracking-widest uppercase text-ink-muted mb-3">SMART Studio · Demo</p>
-    <h1 class="font-serif text-3xl font-semibold text-ink mb-6">The Studio demo</h1>
+    <h1 class="font-serif text-3xl font-semibold text-ink mb-6">The editor is mounted at /studio/edit</h1>
 
-    <p>The Studio editor today lives in the OIML SMART platform application (the private deployment the technical committees use). This page is the honest pointer: what the editor does, and where its walkthrough lives, rather than a fake embed.</p>
+    <p>The Studio editor is the Primmel Studio editor — the model canvas, inspectors, mapper, document map, and review surface — mounted into this site at <a href="/studio/edit" class="text-accent">/studio/edit</a>. The editor source lives in the sibling <a href="https://github.com/primmel/editor" class="text-accent">primmel/editor</a> repo and is consumed here as <code>@primmel/editor</code> from npm.</p>
 
-    <h2>The authoring walkthrough</h2>
-    <p>The end-to-end path, from an empty package to a validated Recommendation model:</p>
+    <h2>What's loaded by default</h2>
+    <p>The default model is the bundled OIML R 60 (load cells) Recommendation — <code>public/models/oiml-r60.prl</code>, regenerated from <code>smart/primmel-packages/oiml-r60/</code> via <code>scripts/bundle-model.mjs</code>. It exercises the editor's full surface: 31 processes, 180 requirements, 107 data classes, plus the OIML plugin's certificate preview and package manifest panels.</p>
+
+    <h2>Try it</h2>
     <ul>
-      <li><strong>Getting started</strong> — the Studio surface and the package layout.</li>
-      <li><strong>Directory structure</strong> — where subjects, processes, forms, and provenance live.</li>
-      <li><strong>Identity and dimensions</strong> — how a subject is individuated and classified.</li>
-      <li><strong>Requirements and conformance tests</strong> — constraints on the subject, and the procedures that probe them.</li>
-      <li><strong>Test report forms</strong> — the evidence interface of every test.</li>
-      <li><strong>The calculation engine</strong> — OCL over the model: derived values, evaluations, verdicts.</li>
-      <li><strong>The evaluation workflow</strong> — from test reports to the determination of conformity.</li>
+      <li><a href="/studio/edit" class="text-accent">Open the editor with the default R 60 model</a></li>
+      <li><a href="/studio/edit?model=/studio/models/oiml-r60.prl" class="text-accent">Same model via explicit <code>?model=</code></a></li>
+      <li>Drag elements from the palette onto the canvas; double-click a process to drill into its subprocess pages</li>
     </ul>
 
-    <p>Each is a chapter in <a href="/studio/docs/" class="text-accent">the Studio guides</a>. The recommended first read is <a href="/studio/docs/guides/getting-started" class="text-accent">Getting started</a>, then <a href="/studio/docs/guides/primmel-studio" class="text-accent">the Primmel Studio chapter</a>.</p>
+    <h2>The authoring walkthrough</h2>
+    <p>The end-to-end path, from an empty package to a validated Recommendation model, is documented in <a href="/studio/docs/" class="text-accent">the Studio guides</a>. The recommended first read is <a href="/studio/docs/guides/getting-started" class="text-accent">Getting started</a>, then <a href="/studio/docs/guides/primmel-studio" class="text-accent">the Primmel Studio chapter</a>.</p>
 
-    <h2>The public surface today</h2>
-    <p>The authored results are public even where the editor is not: the <a href="https://www.oimlsmart.org/recs/" class="text-accent">SMART Recommendations</a> published from Studio, and the <a href="https://www.oimlsmart.org/sst/" class="text-accent">simulated instruments</a> the models drive.</p>
+    <h2>Published results</h2>
+    <p>The authored Recommendations are public even where iteration isn't: the <a href="https://www.oimlsmart.org/recs/" class="text-accent">SMART Recommendations</a> published from Studio, and the <a href="https://www.oimlsmart.org/sst/" class="text-accent">simulated instruments</a> the models drive.</p>
   </main>
 </Base>
