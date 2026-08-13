@@ -289,6 +289,941 @@ process scale_indication {
   ref derives-from "urn:oiml:pub:r:60-1:2021#clause-2.3"
   ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.16"
 }
+class LoadTransmissionRecommendations#data {
+  description { "Load transmissions and recommendations. R 60-3 §4.9.11." }
+  helper { true }
+  diagrams: reference(DocumentationFileRef)[0..*] {
+    definition "Diagrams of load transmissions"
+    modality MAY
+  }
+  description_text: text[0..1] {
+    definition "Free-form description of load transmission recommendations"
+    modality MAY
+  }
+}
+class AccessoryInformation#data {
+  description { "Accessories supplied with the test pattern by the applicant. R 60-3 §4.6. Each field tracks an accessory category; rec-specific sub-classes may extend this for instrument-specific accessory types." }
+  helper { true }
+  analogue_data_processing_device: string[0..1] {
+    definition "Analogue data processing device — remarks and specifications"
+    modality MAY
+  }
+  digital_data_processing_device: string[0..1] {
+    definition "Digital data processing device (terminal) — remarks and specifications"
+    modality MAY
+  }
+  connecting_elements: string[0..1] {
+    definition "Connecting elements (cables, connectors)"
+    modality MAY
+  }
+  junction_boxes: string[0..1] {
+    definition "Junction boxes"
+    modality MAY
+  }
+  other: string[0..1] {
+    definition "Other accessories (description)"
+    modality MAY
+  }
+  photos: reference(DocumentationFileRef)[0..*] {
+    definition "Photographs of accessories"
+    modality MAY
+  }
+}
+class LoadCellReportMetadata#data {
+  description { "Authority responsible for this report. R 60-3 §4.1. The metadata block at the head of an evaluation report." }
+  helper { true }
+  authority: reference(IssuingAuthority) {
+    definition "Issuing Authority issuing the report"
+    modality SHALL
+  }
+  report_identifier: string {
+    definition "Report number"
+    modality SHALL
+  }
+  application_identifier: string {
+    definition "Application number"
+    modality SHALL
+  }
+  test_period_begin: datetime {
+    definition "Period of tests — start"
+    modality SHALL
+  }
+  test_period_end: datetime {
+    definition "Period of tests — end"
+    modality SHALL
+  }
+  issuing_date: datetime {
+    definition "Date of issuing this report"
+    modality SHALL
+  }
+  issuing_person: reference(Contact) {
+    definition "Name of responsible person"
+    modality SHALL
+  }
+  issuing_signature: reference(DocumentationFileRef)[0..1] {
+    definition "Signature of responsible person"
+    modality MAY
+  }
+  issuing_stamps: reference(DocumentationFileRef)[0..*] {
+    definition "Stamp(s) (if applicable)"
+    modality MAY
+  }
+}
+class ReportSynopsis#data {
+  description { "Synopsis of the results of the examination and tests. R 60-3 §4.2." }
+  helper { true }
+  overall_verdict: reference(Verdict) {
+    definition "Overall verdict: whether the load cell under test fulfils ALL applicable requirements per OIML R 60-1"
+    modality SHALL
+  }
+}
+class ExaminationTestsVerdicts#data {
+  description { "Verdicts of the examination tests. R 60-3 §4.3.1." }
+  helper { true }
+  documentation_verdict: reference(Verdict) {
+    definition "Documentation — R 60-2 §2.5"
+    modality SHALL
+  }
+  presentation_verdict: reference(Verdict) {
+    definition "Inscription and presentation of load cell — R 60-1 §6.2"
+    modality SHALL
+  }
+}
+class PerformanceTestsVerdicts#data {
+  description { "Verdicts of performance tests at one temperature condition. R 60-3 §4.3.2. The report carries one PerformanceTestsVerdicts per temperature reference point (T_0i, X_1, X_2, T_0f)." }
+  helper { true }
+  mpme_verdict: reference(Verdict) {
+    definition "Maximum permissible measurement errors — R 60-1 §5.3, R 60-2 §2.10.1"
+    modality SHALL
+  }
+  repeatability_error_verdict: reference(Verdict) {
+    definition "Repeatability error — R 60-1 §5.4, R 60-2 §2.10.1"
+    modality SHALL
+  }
+  temp_dr_verdict: reference(Verdict) {
+    definition "Temperature effect on minimum dead load output return — R 60-1 §5.6.1.3, R 60-2 §2.10.1"
+    modality SHALL
+  }
+  creep_verdict: reference(Verdict) {
+    definition "Creep test — R 60-1 §5.5.1, R 60-2 §2.10.2"
+    modality SHALL
+  }
+  dr_verdict: reference(Verdict) {
+    definition "Minimum dead load output return (DR) — R 60-1 §5.5.2, R 60-2 §2.10.3"
+    modality SHALL
+  }
+  barometric_verdict: reference(Verdict) {
+    definition "Barometric pressure effects at ambient temperature — R 60-1 §5.6.2, R 60-2 §2.10.4"
+    modality SHALL
+  }
+  humidity_verdict: reference(Verdict) {
+    definition "Humidity effects — R 60-1 §5.6.3, R 60-2 §2.10.5/§2.10.6"
+    modality SHALL
+  }
+}
+class DigitalPerformanceTestsVerdicts#data {
+  description { "Verdicts of digital performance tests (analogue-active + digital load cells). R 60-3 §4.3.2 (digital sub-section). Extends PerformanceTestsVerdicts with the electronic test families." }
+  helper { true }
+  extends { PerformanceTestsVerdicts }
+  warm_up_time_verdict: reference(Verdict) {
+    definition "Warm-up time — R 60-1 §5.7, R 60-2 §2.10.7"
+    modality SHALL
+  }
+  power_voltage_verdict: reference(Verdict) {
+    definition "Power voltage variations — R 60-1 §5.7, R 60-2 §2.10.7"
+    modality SHALL
+  }
+  short_time_power_verdict: reference(Verdict) {
+    definition "Short-time power reductions — R 60-1 §5.7, R 60-2 §2.10.7"
+    modality SHALL
+  }
+  bursts_verdict: reference(Verdict) {
+    definition "Bursts (electrical fast transients) — R 60-1 §5.7, R 60-2 §2.10.7"
+    modality SHALL
+  }
+  surge_verdict: reference(Verdict) {
+    definition "Surge — R 60-1 §5.7, R 60-2 §2.10.7"
+    modality SHALL
+  }
+  esd_verdict: reference(Verdict) {
+    definition "Electrostatic discharge — R 60-1 §5.7, R 60-2 §2.10.7"
+    modality SHALL
+  }
+  emc_susceptibility_verdict: reference(Verdict) {
+    definition "Electromagnetic susceptibility (radiated) — R 60-1 §5.7, R 60-2 §2.10.7"
+    modality SHALL
+  }
+  conducted_emc_verdict: reference(Verdict) {
+    definition "Immunity to conducted electromagnetic fields — R 60-1 §5.7, R 60-2 §2.10.7"
+    modality SHALL
+  }
+  span_stability_verdict: reference(Verdict) {
+    definition "Span stability — R 60-1 §5.8, R 60-2 §2.10.7"
+    modality SHALL
+  }
+}
+class ResultsVerdicts#data {
+  description { "All verdicts of the results of the examination and tests. R 60-3 §4.3. Aggregates examination + performance verdicts at each temperature reference point." }
+  helper { true }
+  examination_tests_verdicts: reference(ExaminationTestsVerdicts) {
+    definition "Examination tests verdicts (R 60-3 §4.3.1)"
+    modality SHALL
+  }
+  performance_tests_verdicts_t0i: reference(PerformanceTestsVerdicts) {
+    definition "Performance test verdicts at 20 °C initial (T_0i)"
+    modality SHALL
+  }
+  performance_tests_verdicts_x1: reference(PerformanceTestsVerdicts) {
+    definition "Performance test verdicts at X_1 °C (lower limit)"
+    modality SHALL
+  }
+  performance_tests_verdicts_x2: reference(PerformanceTestsVerdicts) {
+    definition "Performance test verdicts at X_2 °C (upper limit)"
+    modality SHALL
+  }
+  performance_tests_verdicts_t0f: reference(PerformanceTestsVerdicts) {
+    definition "Performance test verdicts at 20 °C final (T_0f)"
+    modality SHALL
+  }
+}
+class TestsPerformedAtTestLaboratory#data {
+  description { "Record of tests performed at a test laboratory. R 60-3 §4.8. Embeds the per-test evaluation reports and the equipment-used records." }
+  helper { true }
+  test_laboratory: reference(TestLaboratory) {
+    definition "Test laboratory that performed the tests"
+    modality SHALL
+  }
+  test_engineers: reference(Contact)[0..*] {
+    definition "Names of test engineer(s)"
+    modality MAY
+  }
+  measurement_range: reference(MeasurementRangeOfTest)[0..1] {
+    definition "Measurement range evaluation (R 60-3 §6.2.2)"
+    modality MAY
+  }
+  input_impedance_evaluation: reference(EvaluationOfInputImpedanceReport)[0..1] {
+    definition "Input impedance evaluation (R 60-3 §6.2.4)"
+    modality MAY
+  }
+  condition_evaluations: reference(EvaluationOfConditionReport)[0..*] {
+    definition "Per-test condition evaluations (R 60-3 §6.2.3)"
+    modality MAY
+  }
+}
+class SuitabilityForTestingReport#data {
+  description { "Suitability for testing report. R 60-2 §2.3, §2.4." }
+  helper { true }
+  date: date {
+    definition "Date of the suitability-for-testing report"
+    modality SHALL
+  }
+  observer: string {
+    definition "Observer of the suitability-for-testing report"
+    modality SHALL
+  }
+  serial_number: string {
+    definition "Serial number of the sample instrument"
+    modality SHALL
+  }
+  fulfils_requirements: boolean {
+    definition "Whether the load cell fulfils the requirements for suitability for testing"
+    modality SHALL
+  }
+  remarks: string[0..1] {
+    definition "Remarks on the suitability-for-testing report"
+    modality MAY
+  }
+  verdict: boolean {
+    definition "Whether the suitability-for-testing report passed (true) or failed (false)"
+    modality SHALL
+  }
+}
+class DocumentationRequirementsReport#data {
+  description { "Documentation requirements report. R 60-3 §5.4, R 60-2 §2.5. Each boolean tracks presence/adequacy of one required documentation element." }
+  helper { true }
+  description_of_general_principle: boolean {
+    definition "Documentation includes a description of the general principle of measurement — R 60-2 §2.5 (a)"
+    modality SHALL
+  }
+  description_of_general_principle_remarks: string[0..1] {
+    definition "Remarks on the description of the general principle of measurement"
+    modality MAY
+  }
+  list_and_characteristics_of_essential_components: boolean {
+    definition "Documentation includes a list and characteristics of essential components — R 60-3 §5.4"
+    modality SHALL
+  }
+  list_and_characteristics_of_essential_components_remarks: string[0..1] {
+    definition "Remarks on the list and characteristics of essential components"
+    modality MAY
+  }
+  mechanical_drawings: boolean {
+    definition "Documentation includes mechanical drawings"
+    modality SHALL
+  }
+  mechanical_drawings_remarks: string[0..1] {
+    definition "Remarks on the mechanical drawings"
+    modality MAY
+  }
+  diagrams_of_load_transmissions: boolean {
+    definition "Documentation includes diagrams of load transmissions"
+    modality MAY
+  }
+  diagrams_of_load_transmissions_remarks: string[0..1] {
+    definition "Remarks on the diagrams of load transmissions"
+    modality MAY
+  }
+  list_of_interoperable_peripherals: boolean {
+    definition "Documentation includes a list of interoperable peripherals"
+    modality MAY
+  }
+  list_of_interoperable_peripherals_remarks: string[0..1] {
+    definition "Remarks on the list of interoperable peripherals"
+    modality MAY
+  }
+  operating_software identification: boolean {
+    definition "Documentation identifies the operating software (where applicable)"
+    modality MAY
+  }
+  operating_software_identification_remarks: string[0..1] {
+    definition "Remarks on the operating-software identification"
+    modality MAY
+  }
+  verdict: reference(Verdict) {
+    definition "Overall verdict for the documentation requirements report"
+    modality SHALL
+  }
+}
+class SoftwareRequirementsReport#data {
+  description { "Software requirements report. R 60-1 §6.1." }
+  helper { true }
+  version: string[0..1] {
+    definition "Version of the software"
+    modality MAY
+  }
+  identification_code: string[0..1] {
+    definition "Identification code of the software"
+    modality MAY
+  }
+  protected_by_sealing: boolean {
+    definition "Whether the software is protected by sealing"
+    modality SHALL
+  }
+  automatic_change_of_identification_code: boolean {
+    definition "Whether the software allows automatic change of identification code (must be false for compliance)"
+    modality SHALL
+  }
+  fixed_version_number: boolean {
+    definition "Whether the software has a fixed version number"
+    modality SHALL
+  }
+  remarks: string[0..1] {
+    definition "Remarks on the software requirements report"
+    modality MAY
+  }
+  verdict: reference(Verdict) {
+    definition "Overall verdict for the software requirements report"
+    modality SHALL
+  }
+}
+class DatasheetKeyInformationPresenceReport#data {
+  description { "Presence of key information in the datasheet. R 60-3 §4.9.6." }
+  helper { true }
+  name: boolean {
+    definition "Presence of name or trademark of manufacturer — R 60-1 §6.2.1/§6.2.2"
+    modality SHALL
+  }
+  type_designation: boolean {
+    definition "Presence of manufacturer's own designation or load cell model — R 60-1 §6.2.1/§6.2.2"
+    modality SHALL
+  }
+  accuracy_class: boolean {
+    definition "Presence of accuracy class(es) and their symbols — R 60-1 §6.2.2/§6.2.4.1"
+    modality MAY
+  }
+  n_lc: boolean {
+    definition "Presence of maximum number of load cell verification intervals n_LC — R 60-1 §6.2.4.5"
+    modality MAY
+  }
+  loading_designation: boolean {
+    definition "Presence of type of load — R 60-1 §6.2.4.2"
+    modality MAY
+  }
+  working_temperature_designation: boolean {
+    definition "Presence of working temperature designation — R 60-1 §6.2.4.3"
+    modality MAY
+  }
+  humidity_symbol: boolean {
+    definition "Presence of humidity symbol — R 60-1 §6.2.4.4"
+    modality MAY
+  }
+  e_max: boolean {
+    definition "Presence of maximum capacity E_max — R 60-1 §6.2.1"
+    modality MAY
+  }
+  e_min: boolean {
+    definition "Presence of minimum dead load E_min — R 60-1 §6.2.2"
+    modality MAY
+  }
+  e_lim: boolean {
+    definition "Presence of safe load limit E_lim — R 60-1 §6.2.2"
+    modality MAY
+  }
+  v_min: boolean {
+    definition "Presence of minimum load cell verification interval v_min — R 60-1 §5.1.3/§6.2.2"
+    modality MAY
+  }
+  apportionment_factor: boolean {
+    definition "Presence of apportionment factor p_LC (if not 0.7) — R 60-1 §3.7.2/§5.3.2"
+    modality MAY
+  }
+}
+class InstrumentKeyInformationPresenceReport#data {
+  description { "Presence of key information on the instrument itself. R 60-3 §4.9.6 (instrument layer). Extends the datasheet report with instrument-specific presence flags." }
+  helper { true }
+  extends { DatasheetKeyInformationPresenceReport }
+  serial_number: boolean {
+    definition "Presence of serial number on the instrument — R 60-1 §6.2.1"
+    modality SHALL
+  }
+  year_of_production: boolean {
+    definition "Presence of year of production — R 60-1 §6.2.1"
+    modality MAY
+  }
+  type_approval_mark: boolean {
+    definition "Presence of type approval mark (where applicable) — R 60-1 §6.2.1"
+    modality MAY
+  }
+}
+class DocumentKeyInformationPresenceReport#data {
+  description { "Presence of key information on the accompanying document. R 60-3 §4.9.6 (document layer). Extends the instrument report with document-only presence flags." }
+  helper { true }
+  extends { InstrumentKeyInformationPresenceReport }
+  standard_classification: boolean {
+    definition "Presence of standard classification — R 60-1 §5.1.6"
+    modality MAY
+  }
+  multiple_classifications: boolean {
+    definition "Presence of multiple classifications — R 60-1 §5.1.7"
+    modality MAY
+  }
+  other_pertinent_conditions: boolean {
+    definition "Presence of other pertinent conditions — R 60-1 §6.2.2"
+    modality MAY
+  }
+}
+class LoadCellInstance#data {
+  description { "Model instance — one specific physical load cell, identified by serial number. R 60-3 §4.7, §4.9.1." }
+  helper { true }
+  extends { MeasuringInstrumentSample }
+  type_information: reference(LoadCellTypeInformation) {
+    definition "Reference to the model this instance is of"
+    modality SHALL
+  }
+  serial_number: string {
+    definition "Serial number of this specific instance"
+    modality SHALL
+  }
+}
+class SelectedSample#data {
+  description { "Selected sample tested and evaluated. R 60-3 §4.7, §4.7.1, §4.7.2." }
+  helper { true }
+  model_instance: reference(LoadCellInstance) {
+    definition "The load cell instance selected"
+    modality SHALL
+  }
+  justification: string[0..1] {
+    definition "Justification / remark for the selection of this test sample"
+    modality MAY
+  }
+}
+class SelectedSamplesForTest#data {
+  description { "Selected sample(s) tested. R 60-3 §4.7." }
+  helper { true }
+  instance_selection: reference(SelectedSample)[1..*] {
+    definition "Instance selection of the test samples"
+    modality SHALL
+  }
+}
+class LoadCellTypeFamilyInformation#data {
+  description { "General information concerning the load cell type (as provided by the manufacturer prior to the evaluation). R 60-3 §4.5, §4.9.7." }
+  helper { true }
+  models: reference(LoadCellTypeInformation)[1..*] {
+    definition "List of models in the type family. Each model is described individually (the draft explicitly avoids a 'range' because ranges are ambiguous; each model carries its own accuracy class and capacity values)"
+    modality SHALL
+  }
+}
+class LoadCellTypeInformation#data {
+  description { "General information concerning a model of the load cell type. R 60-3 §4.5, §4.9.1, §4.9.2, §4.9.7, §4.9.9." }
+  helper { true }
+  manufacturer: reference(ManufacturerInfo) {
+    definition "Manufacturer of the load cell type"
+    modality SHALL
+  }
+  name: string {
+    definition "Manufacturer's name / trade mark"
+    modality SHALL
+  }
+  type_designation: string {
+    definition "Manufacturer's type designation (or load cell model number)"
+    modality SHALL
+  }
+  accuracy_classes: enum {
+    definition "Accuracy class — a single model has a single class. The draft notes modelling as a range would lose per-model precision."
+    modality SHALL
+    enum_values { A B C D }
+  }
+  n_lc: integer {
+    definition "Maximum number of verification intervals, n_LC"
+    modality SHALL
+  }
+  e_max: reference(QuantityValue) {
+    definition "Maximum capacity, E_max (g, kg, t)"
+    modality SHALL
+  }
+  e_min: reference(QuantityValue) {
+    definition "Minimum capacity (minimum dead load), E_min (g, kg, t)"
+    modality SHALL
+  }
+  v_min: reference(QuantityValue) {
+    definition "Minimum load cell verification interval, v_min = (E_max − E_min) / Y (g, kg, t)"
+    modality SHALL
+  }
+  e_lim: reference(QuantityValue) {
+    definition "Safe load limit, E_lim"
+    modality MAY
+  }
+  dr_value: reference(QuantityValue) {
+    definition "DR (dynamic range) value"
+    modality MAY
+  }
+  construction: string[0..1] {
+    definition "Construction (e.g. strain gauge, etc.)"
+    modality MAY
+  }
+  material: string[0..1] {
+    definition "Material"
+    modality MAY
+  }
+  sealing: string[0..1] {
+    definition "Sealing"
+    modality MAY
+  }
+  digital_load_cell: boolean {
+    definition "Whether the load cell is digital (true) or analogue (false)"
+    modality SHALL
+  }
+  rated_output: reference(QuantityValue) {
+    definition "Rated output (mV/V for analogue, counts for digital)"
+    modality MAY
+  }
+  input_impedance: reference(QuantityValue) {
+    definition "Input impedance (Ω)"
+    modality MAY
+  }
+  excitation_voltage: reference(QuantityValue) {
+    definition "Excitation voltage (V)"
+    modality MAY
+  }
+  cable_connection: string[0..1] {
+    definition "Cable connection (description)"
+    modality MAY
+  }
+  cable_length: reference(QuantityValue)[0..1] {
+    definition "Cable length (m). Mandatory for strain-gauge load cells with 4-wire connection."
+    modality MAY
+  }
+  additional_information: string[0..1] {
+    definition "Additional free-form information from the manufacturer"
+    modality MAY
+  }
+  temperature_range_lower_limit: reference(QuantityValue) {
+    definition "Lower limit of the working temperature range (°C). Default −10 °C per R 60-1 §6.2.4.3 when not specified."
+    modality MAY
+  }
+  temperature_range_upper_limit: reference(QuantityValue) {
+    definition "Upper limit of the working temperature range (°C). Default +40 °C per R 60-1 §6.2.4.3 when not specified."
+    modality MAY
+  }
+  humidity_symbol: enum {
+    definition "Humidity symbol (NH / SH / CH / no marking)"
+    modality MAY
+    enum_values { NH SH CH NONE }
+  }
+  loading_designation: enum {
+    definition "Loading designation"
+    modality MAY
+    enum_values { TENSION COMPRESSION UNIVERSAL BEAM_SHEAR BEAM_BENDING }
+  }
+  apportionment_factor: double {
+    definition "Apportionment factor p_LC. Defaults to 0.7 per R 60-1 §3.7.2 when not stated."
+    modality MAY
+  }
+  digital_power_voltage_kind: string[0..1] {
+    definition "Digital load cell: power voltage kind (AC / DC)"
+    modality MAY
+  }
+  digital_supply_voltage: reference(QuantityValue)[0..1] {
+    definition "Digital load cell: supply voltage (V)"
+    modality MAY
+  }
+  digital_interfaces: string[0..1] {
+    definition "Digital load cell: interfaces"
+    modality MAY
+  }
+  digital_output_signal: string[0..1] {
+    definition "Digital load cell: output signal"
+    modality MAY
+  }
+  digital_software_identification: string[0..1] {
+    definition "Digital load cell: software identification"
+    modality MAY
+  }
+  shape: string[0..1] {
+    definition "Shape"
+    modality MAY
+  }
+  design_of_measuring_technique: string[0..1] {
+    definition "Design of measuring technique"
+    modality MAY
+  }
+  mounting: string[0..1] {
+    definition "Mounting"
+    modality MAY
+  }
+  load_transmission: string[0..1] {
+    definition "Load transmission (description; diagrams in load_transmissions_recommendations)"
+    modality MAY
+  }
+  photos: reference(DocumentationFileRef)[0..*] {
+    definition "Photographs of the load cell type"
+    modality MAY
+  }
+  documentation: reference(ApplicationDocument)[0..*] {
+    definition "Documentation supplied with the type"
+    modality MAY
+  }
+  physical_dimensions: reference(PhysicalDimensions)[0..1] {
+    definition "Physical dimensions of the load cell"
+    modality MAY
+  }
+  physical_dimensions_diagram: reference(DocumentationFileRef)[0..1] {
+    definition "Diagram of the physical dimensions"
+    modality MAY
+  }
+  load_transmissions_recommendations: reference(LoadTransmissionRecommendations)[0..1] {
+    definition "Load transmission diagrams and recommendations"
+    modality MAY
+  }
+}
+class LoadCellMandatoryInstrumentMarkings#data {
+  description { "Mandatory markings required on the load cell itself. R 60-1 §6.2.1, R 60-3 §5.1.1. Extends the cross-rec base with the load-cell-specific mandatory marking: maximum capacity E_max." }
+  helper { true }
+  extends { MandatoryInstrumentMarkings }
+  e_max: boolean {
+    definition "Presence of maximum capacity, E_max (in units of g, kg, t)"
+    modality SHALL
+  }
+}
+class LoadCellMandatoryInstrumentOrDocumentMarkings#data {
+  description { "Mandatory markings required on the load cell OR an accompanying document. R 60-1 §6.2.2, R 60-3 §5.1.2. Extends the cross-rec base with the load-cell-specific mandatory markings (n_LC, loading designation, E_min, E_lim, v_min, other pertinent conditions, apportionment factor p_LC, standard/multiple classifications)." }
+  helper { true }
+  extends { MandatoryInstrumentOrDocumentMarkings }
+  n_lc: boolean {
+    definition "Presence of maximum number of load cell verification intervals, n_LC"
+    modality MAY
+  }
+  loading_designation: boolean {
+    definition "Presence of loading designation (where necessary)"
+    modality MAY
+  }
+  e_min: boolean {
+    definition "Presence of minimum dead load, E_min"
+    modality MAY
+  }
+  e_lim: boolean {
+    definition "Presence of safe load limit, E_lim"
+    modality MAY
+  }
+  v_min: boolean {
+    definition "Presence of minimum load cell verification interval, v_min"
+    modality MAY
+  }
+  other_pertinent_conditions: boolean {
+    definition "Presence of other pertinent conditions"
+    modality MAY
+  }
+  apportionment_factor: boolean {
+    definition "Presence of apportionment factor, p_LC (mandatory when p_LC ≠ 0.7)"
+    modality MAY
+  }
+  standard_classification: boolean {
+    definition "Presence of standard classification"
+    modality MAY
+  }
+  multiple_classifications: boolean {
+    definition "Presence of multiple classifications"
+    modality MAY
+  }
+}
+class LoadCellAdditionalInstrumentOrDocumentMarkings#data {
+  description { "Non-mandatory additional information that may appear on the load cell or an accompanying document. R 60-1 §6.2.3. Extends the cross-rec base (which has no universal fields) with the load-cell-specific optional markings." }
+  helper { true }
+  extends { AdditionalInstrumentOrDocumentMarkings }
+  humidity_symbol_ch: boolean {
+    definition "Presence of humidity symbol CH (cyclic humidity)"
+    modality MAY
+  }
+  relative_v_min_y: boolean {
+    definition "Presence of relative v_min, Y"
+    modality MAY
+  }
+  relative_dr_z: boolean {
+    definition "Presence of relative DR, Z"
+    modality MAY
+  }
+}
+class LoadCellMarkingExaminationRequirements#data {
+  description { "R 60 marking-examination section: aggregates the three load-cell-specific marking presence categories. R 60-3 §5.1, R 60-1 §6.2." }
+  helper { true }
+  extends { MarkingExaminationRequirements }
+  mandatory_markings_on_instrument: reference(LoadCellMandatoryInstrumentMarkings)[0..1] {
+    definition "Mandatory markings on the load cell (R 60-specific)"
+    modality MAY
+  }
+  mandatory_markings_on_instrument_or_document: reference(LoadCellMandatoryInstrumentOrDocumentMarkings)[0..1] {
+    definition "Mandatory markings on the load cell or an accompanying document (R 60-specific)"
+    modality MAY
+  }
+  additional_markings_on_instrument_or_document: reference(LoadCellAdditionalInstrumentOrDocumentMarkings)[0..1] {
+    definition "Non-mandatory additional information (R 60-specific)"
+    modality MAY
+  }
+}
+class MeasurementRangeOfTest#data {
+  description { "Measurement range of the test. R 60-3 §6.2.2, R 60-2 §5.2/§5.5.2. Records D_max, D_min, conversion factor, and whether the load cell fulfils the measurement-range requirements." }
+  helper { true }
+  fulfils_requirements: boolean {
+    definition "Whether the load cell fulfils the requirements for measurement range"
+    modality SHALL
+  }
+  test_procedure_reference: string[0..1] {
+    definition "Reference to the test procedure used for evaluation of measurement range"
+    modality MAY
+  }
+  d_max: reference(QuantityValue) {
+    definition "Maximum dead load output (D_max)"
+    modality SHALL
+  }
+  d_min: reference(QuantityValue) {
+    definition "Minimum dead load output (D_min)"
+    modality SHALL
+  }
+  conversion_factor: reference(QuantityValue) {
+    definition "Conversion factor f [indication / v] — R 60-3 §2.1.2.4"
+    modality SHALL
+  }
+}
+class EvaluationVerdictOfMeasurementRangePerTest#data {
+  description { "Evaluation verdict of measurement range per test. R 60-3 §6.2.2, R 60-2 §5.2/§5.5.2." }
+  helper { true }
+  measurement_range: reference(MeasurementRangeOfTest) {
+    definition "The measurement-range record this verdict applies to"
+    modality SHALL
+  }
+  verdict: reference(Verdict) {
+    definition "Verdict for this measurement range"
+    modality SHALL
+  }
+}
+class EvaluationOfMeasurementRangeReport#data {
+  description { "Aggregated evaluation of measurement range report. R 60-3 §6.2.2. One entry per test where measurement range was evaluated." }
+  helper { true }
+  per_test_verdicts: reference(EvaluationVerdictOfMeasurementRangePerTest)[0..*] {
+    definition "Per-test measurement-range verdicts"
+    modality MAY
+  }
+}
+class EvaluationOfConditionPerTest#data {
+  description { "Evaluation of condition per test. R 60-3 §6.2.3, R 60-2 §2.8.1. Records D_min, D_max, n_LC for one specific test." }
+  helper { true }
+  d_min: reference(QuantityValue) {
+    definition "Minimum dead load output (D_min) for this test"
+    modality SHALL
+  }
+  d_max: reference(QuantityValue) {
+    definition "Maximum dead load output (D_max) for this test"
+    modality SHALL
+  }
+  n_lc: reference(QuantityValue) {
+    definition "Maximum number of load cell verification intervals n_LC for this test"
+    modality SHALL
+  }
+}
+class EvaluationOfConditionPerTestVerdict#data {
+  description { "Per-test condition-evaluation verdict. R 60-3 §6.2.3, R 60-2 §2.8.1." }
+  helper { true }
+  condition: reference(EvaluationOfConditionPerTest) {
+    definition "The condition record this verdict applies to"
+    modality SHALL
+  }
+  verdict: reference(Verdict) {
+    definition "Verdict for this condition evaluation"
+    modality SHALL
+  }
+}
+class EvaluationOfConditionReport#data {
+  description { "Aggregated evaluation of condition report. R 60-3 §6.2.3. One entry per test where condition was evaluated." }
+  helper { true }
+  per_test_verdicts: reference(EvaluationOfConditionPerTestVerdict)[0..*] {
+    definition "Per-test condition verdicts"
+    modality MAY
+  }
+}
+class EvaluationOfInputImpedanceReport#data {
+  description { "Evaluation of input impedance. R 60-3 §6.2.4, R 60-3 §4.5, R 60-2 §2.9." }
+  helper { true }
+  test_procedure_reference: string[0..1] {
+    definition "Reference to the test procedure used for evaluation of input impedance"
+    modality MAY
+  }
+  measured_value: reference(QuantityValue) {
+    definition "Measured input impedance value (Ω)"
+    modality SHALL
+  }
+  verdict: reference(Verdict) {
+    definition "Verdict for the input impedance evaluation"
+    modality SHALL
+  }
+}
+class EvaluationOfPerformanceTestLoadCellErrors#data {
+  description { "Evaluation of performance test: Load cell errors (E_L). R 60-1 §5.3, R 60-2 §2.10, R 60-3 §2.1.2." }
+  helper { true }
+  extends { PerformanceTestEvaluationReport }
+}
+class EvaluationOfPerformanceTestRepeatabilityErrors#data {
+  description { "Evaluation of performance test: Repeatability errors (E_R). R 60-1 §5.4, R 60-2 §2.10, R 60-3 §2.1.3." }
+  helper { true }
+  extends { PerformanceTestEvaluationReport }
+}
+class EvaluationOfPerformanceTestCreepCt#data {
+  description { "Evaluation of performance test: Creep C_C(t). R 60-1 §5.5.1, R 60-2 §2.10.2, R 60-3 §2.1.5." }
+  helper { true }
+  extends { PerformanceTestEvaluationReport }
+}
+class EvaluationOfPerformanceTestCreepC30_20#data {
+  description { "Evaluation of performance test: Creep C_C(30–20). R 60-1 §5.5.1, R 60-2 §2.10.2, R 60-3 §2.1.5.2." }
+  helper { true }
+  extends { PerformanceTestEvaluationReport }
+}
+class EvaluationOfPerformanceTestDR#data {
+  description { "Evaluation of performance test: Minimum dead load output return (C_DR). DR is in units of (g, kg, t) and determined per R 60-3 §2.1.5.8. R 60-1 §5.5.2, R 60-2 §2.10.3, R 60-3 §2.1.5.4." }
+  helper { true }
+  extends { PerformanceTestEvaluationReport }
+}
+class EvaluationOfPerformanceTestHumidityEffectsCHmin#data {
+  description { "Evaluation of performance test: Humidity effects (CH_min), CH or no mark. R 60-1 §5.6.3.1, R 60-2 §2.10.5, R 60-3 §2.1.7.1." }
+  helper { true }
+  extends { PerformanceTestEvaluationReport }
+}
+class EvaluationOfPerformanceTestHumidityEffectsCHmax#data {
+  description { "Evaluation of performance test: Humidity effects (CH_max), CH or no mark. R 60-1 §5.6.3.1, R 60-2 §2.10.5, R 60-3 §2.1.7." }
+  helper { true }
+  extends { PerformanceTestEvaluationReport }
+}
+class EvaluationOfPerformanceTestHumidityEffectsSH#data {
+  description { "Evaluation of performance test: Humidity effects (SH). R 60-1 §5.6.3.2, R 60-2 §2.10.6, R 60-3 §2.1.8." }
+  helper { true }
+  extends { PerformanceTestEvaluationReport }
+}
+class EvaluationOfPerformanceTestTemperatureEffectsCM#data {
+  description { "Evaluation of performance test: Temperature effects on minimum dead load output (C_M). R 60-1 §5.6.1, R 60-2 §2.10.1, R 60-3 §2.1.6." }
+  helper { true }
+  extends { PerformanceTestEvaluationReport }
+}
+class EvaluationOfPerformanceTestBarometricPressureEffectsCP#data {
+  description { "Evaluation of performance test: Barometric pressure effects (C_P). R 60-1 §5.6.2, R 60-2 §2.10.4, R 60-3 §2.1.7.3." }
+  helper { true }
+  extends { PerformanceTestEvaluationReport }
+}
+class EvaluationOfPerformanceTestWarmUpTime#data {
+  description { "Evaluation of performance test: Warm-up time. R 60-1 §5.7, R 60-2 §2.10.7, R 60-3 §2.1.9." }
+  helper { true }
+  extends { PerformanceTestEvaluationReport }
+}
+class EvaluationOfPerformanceTestPowerVoltageVariations#data {
+  description { "Evaluation of performance test: Power voltage variations. R 60-1 §5.7, R 60-2 §2.10.7, R 60-3 §2.1.9." }
+  helper { true }
+  extends { PerformanceTestEvaluationReport }
+}
+class EvaluationOfPerformanceTestShortTimePowerReductions#data {
+  description { "Evaluation of performance test: Short-time power reductions. R 60-1 §5.7, R 60-2 §2.10.7, R 60-3 §2.1.9." }
+  helper { true }
+  extends { PerformanceTestEvaluationReport }
+}
+class EvaluationOfPerformanceTestBursts#data {
+  description { "Evaluation of performance test: Bursts (electrical fast transients). R 60-1 §5.7, R 60-2 §2.10.7, R 60-3 §2.1.9." }
+  helper { true }
+  extends { PerformanceTestEvaluationReport }
+}
+class EvaluationOfPerformanceTestSurge#data {
+  description { "Evaluation of performance test: Surge. R 60-1 §5.7, R 60-2 §2.10.7, R 60-3 §2.1.9." }
+  helper { true }
+  extends { PerformanceTestEvaluationReport }
+}
+class EvaluationOfPerformanceTestElectrostaticDischarge#data {
+  description { "Evaluation of performance test: Electrostatic discharge. R 60-1 §5.7, R 60-2 §2.10.7, R 60-3 §2.1.9." }
+  helper { true }
+  extends { PerformanceTestEvaluationReport }
+}
+class EvaluationOfPerformanceTestElectromagneticSusceptibility#data {
+  description { "Evaluation of performance test: Electromagnetic susceptibility (radiated). R 60-1 §5.7, R 60-2 §2.10.7, R 60-3 §2.1.9." }
+  helper { true }
+  extends { PerformanceTestEvaluationReport }
+}
+class EvaluationOfPerformanceTestImmunityToConductedElectromagneticFields#data {
+  description { "Evaluation of performance test: Immunity to conducted electromagnetic fields. R 60-1 §5.7, R 60-2 §2.10.7, R 60-3 §2.1.9." }
+  helper { true }
+  extends { PerformanceTestEvaluationReport }
+}
+class EvaluationOfPerformanceTestSpanStability#data {
+  description { "Evaluation of performance test: Span stability. R 60-1 §5.8, R 60-2 §2.10.7, R 60-3 §2.1.10." }
+  helper { true }
+  extends { PerformanceTestEvaluationReport }
+}
+class EvaluationOfPerformanceTestUnitUsage#data {
+  description { "Per-test-family units in which measurement results are displayed, one slot per R 60-2 §2.10 subclause. R 60-3 §6.2.1." }
+  helper { true }
+  extends { PerformanceTestUnitUsageCollection }
+  part_2_10_1_measurement repeatability temperature_effects_on_mdlo: reference(PerformanceTestUnitUsage)[0..1] {
+    definition "Measurement error, repeatability error, and temperature effect on minimum dead load output. R 60-2 §2.10.1."
+    modality MAY
+  }
+  part_2_10_2_creep: reference(PerformanceTestUnitUsage)[0..1] {
+    definition "Determination of creep error. R 60-2 §2.10.2."
+    modality MAY
+  }
+  part_2_10_3_dr: reference(PerformanceTestUnitUsage)[0..1] {
+    definition "Minimum dead load output return (DR). R 60-2 §2.10.3."
+    modality MAY
+  }
+  part_2_10_4_barometric_pressure: reference(PerformanceTestUnitUsage)[0..1] {
+    definition "Barometric pressure effects. R 60-2 §2.10.4."
+    modality MAY
+  }
+  part_2_10_5_humidity_ch_or_unmarked: reference(PerformanceTestUnitUsage)[0..1] {
+    definition "Humidity effects for load cells marked CH or not marked. R 60-2 §2.10.5."
+    modality MAY
+  }
+  part_2_10_6_humidity_sh: reference(PerformanceTestUnitUsage)[0..1] {
+    definition "Humidity effects for load cells marked SH. R 60-2 §2.10.6."
+    modality MAY
+  }
+  part_2_10_7_analogue_active_additional: reference(PerformanceTestUnitUsage)[0..1] {
+    definition "Additional tests for analogue-active cells. R 60-2 §2.10.7."
+    modality MAY
+  }
+}
 class Application#data {
   store { applications }
   indexes { manufacturer_id status standard_id model_family_id }
@@ -3257,6 +4192,26 @@ class OperationalState#data {
     on_delete cascade
   }
 }
+class PhysicalDimensions#data {
+  description { "The sample's physical dimensions as registered on receipt (R 60-3, 4.9.10 — the report form's load-cell-dimensions entry, whose table carries the pictures/drawings of the dimensions). Every facet is an optional quantity-with-unit in mm; only the dimensions relevant to the instrument's shape are recorded (a cylindrical load cell records height + diameter, never length/width)." }
+  helper { true }
+  length: reference(QuantityValue)[0..1] {
+    definition "Overall length (QuantityValue { value, unit: mm })"
+    modality MAY
+  }
+  width: reference(QuantityValue)[0..1] {
+    definition "Overall width (QuantityValue { value, unit: mm })"
+    modality MAY
+  }
+  height: reference(QuantityValue)[0..1] {
+    definition "Overall height (QuantityValue { value, unit: mm })"
+    modality MAY
+  }
+  diameter: reference(QuantityValue)[0..1] {
+    definition "Body diameter (QuantityValue { value, unit: mm })"
+    modality MAY
+  }
+}
 class MeasuringInstrumentModelFamily#data {
   store { measuringInstrumentModelFamilies }
   description { "Family of measuring instruments (OIML V 1:2022, 4.02; R 60-1, 3.4.2). HAS MANY Models (optionally via Groups). Its classification and parameters act as defaults inherited by its groups/models (INV-10)." }
@@ -3506,6 +4461,18 @@ class MeasuringInstrumentSample#data {
   }
   test_context: map<attribute_id, QuantityValue>[0..1] {
     definition "Sample-scope test-dependent attributes (attributes.yaml origin: test-dependent — d_min, d_max, v, n, mr, conversion_factor_f); values under test, never inherited downward"
+    modality MAY
+  }
+  physical_dimensions: reference(PhysicalDimensions)[0..1] {
+    definition "Physical dimensions registered on receipt (R 60-3, 4.9.10 — the report form's load-cell-dimensions entry); embedded, each facet a QuantityValue in mm"
+    modality MAY
+  }
+  selected_for_evaluation: boolean[0..1] {
+    definition "The IA's selection of this sample for the type evaluation (R 60-3, 4.7 — selection of the sample(s) tested): the evaluation tests a subset of the received samples; absent/false = not selected. Only a registered (received) sample is selectable."
+    modality MAY
+  }
+  selection_justification: text[0..1] {
+    definition "The recorded justification of the selection decision (R 60-3, 4.7.2 — justification of the selection of the test sample(s), referring to R 60-2, 2.3/2.4 and Annex D)"
     modality MAY
   }
   verification_state: enum[0..1] {
@@ -4694,6 +5661,51 @@ class VerificationRecord#data {
   modified: datetime {
     definition ""
     modality SHALL
+  }
+}
+enum AccuracyClass {
+  A {
+    definition ""
+  }
+  B {
+    definition ""
+  }
+  C {
+    definition ""
+  }
+  D {
+    definition ""
+  }
+}
+enum HumiditySymbol {
+  NH {
+    definition ""
+  }
+  SH {
+    definition ""
+  }
+  CH {
+    definition ""
+  }
+  NONE {
+    definition ""
+  }
+}
+enum LoadingDesignation {
+  TENSION {
+    definition ""
+  }
+  COMPRESSION {
+    definition ""
+  }
+  UNIVERSAL {
+    definition ""
+  }
+  BEAM_SHEAR {
+    definition ""
+  }
+  BEAM_BENDING {
+    definition ""
   }
 }
 reference r60-1-5.1.1 {
@@ -9121,6 +10133,101 @@ competence_kind software_examination {
   source { doc "ISO/IEC 17025:2017, 6.2" clause "" }
   method_standard oiml-d-31 "OIML D 31 General requirements for software-controlled measuring instruments"
 }
+predicate requirement {
+  kind citation
+  description "This form or test provides evidence for the target requirement clause."
+  subject_kinds { form field conformance_test }
+  target_kinds { document-anchor }
+  resolution must-resolve
+}
+predicate test-procedure {
+  kind citation
+  description "The test procedure the element follows (R 60-2's 2.x procedures)."
+  subject_kinds { form conformance_test }
+  target_kinds { document-anchor }
+  resolution must-resolve
+}
+predicate calculation {
+  kind citation
+  description "The computation procedure the element realizes (R 60-3's 2.1.x procedures)."
+  subject_kinds { form calculation }
+  target_kinds { document-anchor }
+  resolution must-resolve
+}
+predicate report-format {
+  kind citation
+  description "The report-format clause/table this form renders (R 60-3's clause 4-6 tables)."
+  subject_kinds { form field }
+  target_kinds { document-anchor }
+  resolution must-resolve
+}
+predicate derives-from {
+  kind citation
+  description "The clause this element is the model's interpretation of (provenance; the legacy source { doc clause } pair computed to one anchor)."
+  subject_kinds { requirement conformance_test form field calculation symbol term package }
+  target_kinds { document-anchor }
+  resolution must-resolve
+  inverse interpreted-by
+}
+predicate interpreted-by {
+  kind citation
+  description "The inverse of derives-from: the model element that interprets this clause."
+  subject_kinds { package }
+  target_kinds { document-anchor }
+  inverse derives-from
+}
+predicate cites {
+  kind citation
+  description "An informative citation (the legacy reference / specification_reference facets)."
+  subject_kinds { form field requirement conformance_test calculation symbol term package }
+  target_kinds { document-anchor }
+}
+predicate definition {
+  kind citation
+  description "The clause that DEFINES the quantity or notion this element records (distinct from derives-from — the clause the element interprets — and from the evidence roles)."
+  subject_kinds { form field }
+  target_kinds { document-anchor }
+  resolution must-resolve
+}
+predicate implements {
+  kind semantic
+  description "This (implementation-side) element fulfils that (reference-side) element — the reference/implementation mapping edge."
+  subject_kinds { package requirement conformance_test form field process data_class }
+  target_kinds { model-element }
+  inverse implemented-by
+}
+predicate implemented-by {
+  kind semantic
+  description "The inverse of implements."
+  subject_kinds { package requirement conformance_test form field process data_class }
+  target_kinds { model-element }
+  inverse implements
+}
+predicate equivalent {
+  kind semantic
+  description "The two elements state the same constraint (cross-standard equivalence; symmetric)."
+  subject_kinds { requirement conformance_test form field calculation symbol term }
+  target_kinds { model-element }
+  symmetric true
+}
+predicate supersedes {
+  kind semantic
+  description "This edition or element replaces the target (edition lineage, lifecycle)."
+  subject_kinds { package requirement conformance_test form }
+  target_kinds { model-element document-anchor }
+}
+predicate restates {
+  kind semantic
+  description "A normative restatement of the target without change (the layer-overlay vocabulary)."
+  subject_kinds { requirement conformance_test form field }
+  target_kinds { model-element }
+}
+predicate specializes {
+  kind semantic
+  description "A narrowing of the target (see the specialization facet for the structured class-instance mechanism — this predicate is the citation-grade variant)."
+  subject_kinds { requirement conformance_test }
+  target_kinds { model-element }
+}
 constraint dead_load_max_geometry {
   stereotype inv
   name "Dead-load maximum geometry"
@@ -12868,7 +13975,7 @@ instrument LoadCell {
   family {
     metamodel_class MeasuringInstrumentModelFamily
     definition "Group of load cells which for the purposes of type evaluation are considered as one family, sharing material, measurement technique, construction method and specifications, and comprising one or more load cell groups with identical metrological characteristics."
-    source { doc "urn:oiml:pub:r:60-1:2021" clause "3.4.2" }
+    ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.4.2"
   }
   family_criteria {
     "same material or combination of materials (e.g. mild steel, stainless steel, aluminium)"
@@ -12887,12 +13994,12 @@ instrument LoadCell {
     note "Sample selection within a family/group for type evaluation follows R 60-2, 2.4 with a practical example in R 60-2, Annex D."
     identical_characteristics { metrological_class n_lc y z temperature_rating }
     identical_attributes { accuracy_class n_lc y z t_min t_max }
-    source { doc "urn:oiml:pub:r:60-1:2021" clause "3.4.2" }
-    source { doc "urn:oiml:pub:r:60-1:2021" clause "5.1.5" }
+    ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.4.2"
+    ref derives-from "urn:oiml:pub:r:60-1:2021#clause-5.1.5"
     sample_selection { doc "urn:oiml:pub:r:60-2:2021" clause "2.4" }
     sample_selection { doc "urn:oiml:pub:r:60-2:2021" clause "Annex D" }
   }
-  source { doc "urn:oiml:pub:r:60-1:2021" clause "3.1.3" }
+  ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.1.3"
 }
 attribute_definition technology {
   name "Technology"
@@ -16174,6 +17281,7 @@ quantity_register r60 {
   kind pressure { dimensions { L -1 M 1 T -2 } si_unit "Pa" }
   kind frequency { dimensions { T -1 } si_unit "Hz" }
   kind voltage { dimensions { I -1 L 2 M 1 T -3 } si_unit "V" }
+  kind electric-resistance { dimensions { I -2 L 2 M 1 T -3 } si_unit "Ω" }
   kind acceleration { dimensions { L 1 T -2 } si_unit "m/s²" }
   kind relative-humidity { si_unit "1" }
   kind verification_interval { si_unit "1" }
@@ -16202,6 +17310,9 @@ quantity_register r60 {
   unit counts { symbol "counts" label "ADC counts" kind count }
   unit dimensionless { label "dimensionless" kind dimensionless }
   unit mV { symbol "mV" label "millivolt" kind voltage factor 0.001 }
+  unit mm { symbol "mm" label "millimetre" kind length factor 0.001 }
+  unit ohm { symbol "Ω" label "ohm" kind electric-resistance definition "V/A" }
+  unit mV_per_V { symbol "mV/V" label "millivolt per volt" kind dimensionless factor 0.001 definition "rated output ratio (R 60-1, 3.4.2)" }
   unit EUR { symbol "€" label "euro" kind currency }
 }
 invariant INV-1 {
