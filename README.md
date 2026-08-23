@@ -15,15 +15,22 @@ repo serves the component's site at <https://www.oimlsmart.org/studio>.
 
 ## The model bundle
 
-`/studio/models/oiml-r60.prl` is a BUILD ARTIFACT, never committed
-(`public/models/` is gitignored). `scripts/bundle-model.mjs` runs on
-`prebuild`/`predev`: it composes the PRL package from the SSOT checkout
-(`$SMART_REPO/primmel-packages`, default `~/src/oimlsmart/smart`; CI checks
-oimlsmart/smart out at `vendor/smart` and sets `SMART_REPO`) with the studio's
-own npm-pinned `@primmel/primmel` kernel, prepends the package manifest (the
-merge's dump carries no `package { }` block, and the manifest panel needs it),
-and writes the bundle. Composition failure is fatal; on CI a missing packages
-root is fatal, locally it is a loud skip (docs-only clones can still build).
+`/studio/models/oiml-r60.prl` is committed and refreshed by
+`scripts/bundle-model.mjs` (also wired to `prebuild`/`predev`): it
+composes the PRL package from the SSOT checkout
+(`$SMART_REPO/primmel-packages`, default `~/src/oimlsmart/smart`) with
+the studio's own npm-pinned `@primmel/primmel` kernel, prepends the
+package manifest (the merge's dump carries no `package { }` block, and
+the manifest panel needs it), and writes the bundle. Composition failure
+is fatal; a missing packages root with `SMART_REPO` declared is fatal,
+undeclared is a loud skip (the committed bundle serves).
+
+Freshness is enforced by the `bundle-freshness` CI job: regenerate from
+a smart checkout and diff byte-identical against the committed bundle.
+The smart repo is private, so the job is gated on repo variable
+`SMART_REPO_AVAILABLE` (needs secret `SMART_REPO_PAT`, a fine-grained
+read PAT — the oimlsmart.github.io gates.yml pattern) and skips cleanly
+until the coordinator configures it.
 
 `@primmel/editor` is consumed from `github:primmel/editor#main` until the next
 npm release carries the viewer mode; flip to the published `^0.4.0` then.

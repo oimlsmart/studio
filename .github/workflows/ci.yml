@@ -16,28 +16,14 @@ jobs:
         with:
           repository: oimlsmart/site-shell
           path: vendor/site-shell
-
-      # The model bundle regenerates at build time (scripts/bundle-model.mjs,
-      # npm run prebuild) from the PRL packages SSOT — oimlsmart/smart is
-      # private, so the checkout rides the org's read PAT (visibility: all).
-      # main-tracking on purpose: the honest fix for the stale committed
-      # bundle is "regenerate every build, never commit". The bundled
-      # revision is logged by the bundler.
-      - name: Checkout the smart repo (the PRL packages SSOT)
-        uses: actions/checkout@v4
-        with:
-          repository: oimlsmart/smart
-          path: vendor/smart
-          token: ${{ secrets.METANORMA_CI_PAT_TOKEN }}
-
       - uses: actions/setup-node@v4
         with:
           node-version: 24
       - run: npm ci
-      - name: Build (the prebuild hook regenerates the model bundle)
-        run: npm run build
-        env:
-          SMART_REPO: vendor/smart
+      # The prebuild hook regenerates the model bundle when a smart
+      # checkout is present (local devs); with none declared it keeps the
+      # committed bundle. The freshness gate is the bundle-freshness job.
+      - run: npm run build
 
       - name: Verify the page, the bundle, and the canonical logo asset
         run: |
@@ -62,22 +48,11 @@ jobs:
         with:
           repository: oimlsmart/site-shell
           path: vendor/site-shell
-
-      - name: Checkout the smart repo (the PRL packages SSOT)
-        uses: actions/checkout@v4
-        with:
-          repository: oimlsmart/smart
-          path: vendor/smart
-          token: ${{ secrets.METANORMA_CI_PAT_TOKEN }}
-
       - uses: actions/setup-node@v4
         with:
           node-version: 24
       - run: npm ci
-      - name: Build (the prebuild hook regenerates the model bundle)
-        run: npm run build
-        env:
-          SMART_REPO: vendor/smart
+      - run: npm run build
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
@@ -113,3 +88,48 @@ jobs:
       - name: Stop preview
         if: always()
         run: npx astro preview stop || true
+
+  bundle-freshness:
+    # The SSOT freshness gate (the oimlsmart.github.io gates.yml
+    # pattern): regenerates the model bundle from the PRIVATE
+    # oimlsmart/smart repository and diffs it byte-identical against the
+    # committed one. GitHub Actions can only check that repo out when a
+    # PAT is configured:
+    #
+    #   1. create a fine-grained PAT with read access to oimlsmart/smart
+    #   2. add it as secret  SMART_REPO_PAT
+    #   3. set repo variable SMART_REPO_AVAILABLE = true
+    #
+    # Until then this job skips cleanly; the regeneration still runs
+    # locally wherever both repos are checked out side by side
+    # (node scripts/bundle-model.mjs, then commit the result).
+    if: ${{ vars.SMART_REPO_AVAILABLE == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout the shell package (the chrome SSOT)
+        uses: actions/checkout@v4
+        with:
+          repository: oimlsmart/site-shell
+          path: vendor/site-shell
+
+      - name: Check out the smart repo (the PRL packages SSOT)
+        uses: actions/checkout@v4
+        with:
+          repository: oimlsmart/smart
+          path: vendor/smart
+          token: ${{ secrets.SMART_REPO_PAT }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+
+      - name: Regenerate the bundle and diff byte-identical against the committed one
+        run: |
+          set -euo pipefail
+          node scripts/bundle-model.mjs oiml-r60 "$RUNNER_TEMP/fresh-bundle.prl"
+          diff -q "$RUNNER_TEMP/fresh-bundle.prl" public/models/oiml-r60.prl
+        env:
+          SMART_REPO: vendor/smart
