@@ -6,15 +6,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `oimlsmart/studio` serves the OIML SMART Studio **minisite** at
 <https://www.oimlsmart.org/studio> — and, since 0.2.0, also **mounts the
-editor itself** at `/studio/edit`. The editor is the Primmel Studio
-editor (model canvas, inspectors, mapper, etc.) consumed as the npm
-package `@primmel/editor`; the minisite is the four-page public face
-(About / Story / Docs / Studio nav).
+editor itself** at `/studio/edit`, plus the **read-only viewer** at
+`/studio/view` (the viewer wave). The editor is the Primmel Studio
+editor (model canvas, inspectors, mapper, etc.); the minisite is the
+public face (About / Story / Docs / Demo / Viewer / Studio nav).
 
 The editor source lives in a sibling repo (`~/src/primmel/editor/`,
-GitHub: `primmel/editor`). This repo consumes the published version
-(`@primmel/editor@^0.2.0`) — no vendored copy. The Primmel kernel
-(`@primmel/primmel@^1.5.3`) is also consumed from npm.
+GitHub: `primmel/editor`). This repo consumes `github:primmel/editor#main`
+until the next npm release carries the viewer mode (`readOnly` mount
+option); flip to the published `^0.4.0` then. The Primmel kernel
+(`@primmel/primmel@^1.6.1`) is consumed from npm.
 
 ## Commands
 
@@ -34,20 +35,22 @@ Astro 7, static output, `base: '/studio'`. Node 24 in CI.
 GitHub as a separate workflow step before `npm ci`. If `npm ci` fails
 locally with a missing-shell error, this is why.
 
-### Regenerating the R60 model bundle
+### The model bundle
 
-The editor at `/studio/edit` loads `public/models/oiml-r60.prl` — a
-server-side bundle of the R60 Recommendation package. Regenerate when
-the upstream R60 package changes:
-
-```sh
-node scripts/bundle-model.mjs oiml-r60
-```
-
-The bundler loads `~/src/oimlsmart/smart/primmel-packages/oiml-r60/`
-with `uses` composition via the local kernel build, then `dump()`s the
-merged Standard as a single .prl. Browser builds of the kernel can't
-resolve `include` directives (no fs), so bundling is server-side.
+Both editor surfaces load `/studio/models/oiml-r60.prl` — a server-side
+bundle of the R60 Recommendation package. **The bundle is a build
+artifact and is never committed** (`public/models/` is gitignored);
+`scripts/bundle-model.mjs` runs on `prebuild`/`predev`. It composes the
+package with `uses` resolution from `$SMART_REPO/primmel-packages`
+(default `~/src/oimlsmart/smart`; CI checks oimlsmart/smart out at
+`vendor/smart` and sets `SMART_REPO`) using this repo's own npm-pinned
+kernel, then prepends the package's `package.primmel` (the merge's
+`dump()` carries no `package { }` block, and the editor's manifest panel
+needs the identity). Composition failure is fatal — the old
+load-without-deps fallback once silently shipped a partial model. On CI
+a missing packages root is fatal; locally it is a loud skip so docs-only
+clones can still build. Browser builds of the kernel can't resolve
+`include` directives (no fs), so bundling stays server-side.
 
 ## Architecture
 
@@ -67,14 +70,17 @@ particular:
 
 ### Page layout
 
-Five top-level pages, each a thin Astro file wrapping content in
-`<Base>` + `<MinisiteNav>` with a 4-item nav:
+Six top-level pages, each a thin Astro file wrapping content in
+`<Base>` + `<MinisiteNav>` with the 6-item nav:
 
 - `src/pages/index.astro` — About / hero
 - `src/pages/story.astro` — narrative
-- `src/pages/demo.astro` — historically the "honest pointer" to where
-  the editor was said to live; needs updating now that the editor is
-  actually mounted at `/studio/edit`
+- `src/pages/demo.astro` — the honest pointer: the viewer is the public
+  surface, the editor is the authoring surface
+- `src/pages/view.astro` — **the viewer**: the editor mounted with
+  `readOnly: true` (the store refuses every mutation; the palette,
+  New/Save/Import and inspector editing hide; the tree, canvas, code,
+  mapping lenses, diff and validation stay)
 - `src/pages/edit.astro` — **the editor**: `<div id="editor-root">` +
   an inline `<script type="module">` that fetches the model and calls
   `mount()` from `@primmel/editor`
@@ -89,15 +95,13 @@ Five top-level pages, each a thin Astro file wrapping content in
 import { mount } from '@primmel/editor'
 const model = new URLSearchParams(location.search).get('model') || '/studio/models/oiml-r60.prl'
 const initialText = await (await fetch(model)).text()
-mount(document.getElementById('editor-root'), { initialText })
+mount(document.getElementById('editor-root'), { initialText, brand })
 ```
 
 The `?model=` URL parameter swaps models. Default is the bundled R60.
-
-The published `@primmel/editor@^0.2.0` `mount()` accepts `{ plugins,
-initialText, ready }`. It does NOT yet accept `brand` — brand
-customization (replacing the default "Primmel Atelier" wordmark with
-"OIML SMART STUDIO") is a follow-up editor PR.
+`mount()` accepts `{ plugins, initialText, brand, readOnly, ready }` —
+`brand` overrides the default "Primmel Atelier" wordmark (here: "OIML
+SMART STUDIO" / "OIML SMART VIEWER"), `readOnly` mounts the viewer.
 
 ### Content collection
 
