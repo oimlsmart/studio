@@ -8,6 +8,8 @@ const NAV = [
   { label: 'Story', href: '/story' },
   { label: 'Docs', href: '/docs' },
   { label: 'Demo', href: '/demo' },
+  { label: 'Viewer', href: '/view' },
+  { label: 'Studio', href: '/edit' },
 ]
 const allDocs = await getCollection('docs')
 const chapters = allDocs.filter(d => d.id.startsWith('guides/') && true)

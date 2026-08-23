@@ -2,3 +2,5 @@ node_modules/
 dist/
 .astro/
 vendor/
+# The model bundle regenerates at build time (scripts/bundle-model.mjs) — never commit it.
+public/models/

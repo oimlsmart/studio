@@ -16,16 +16,35 @@ jobs:
         with:
           repository: oimlsmart/site-shell
           path: vendor/site-shell
+
+      # The model bundle regenerates at build time (scripts/bundle-model.mjs,
+      # npm run prebuild) from the PRL packages SSOT — oimlsmart/smart is
+      # private, so the checkout rides the org's read PAT (visibility: all).
+      # main-tracking on purpose: the honest fix for the stale committed
+      # bundle is "regenerate every build, never commit". The bundled
+      # revision is logged by the bundler.
+      - name: Checkout the smart repo (the PRL packages SSOT)
+        uses: actions/checkout@v4
+        with:
+          repository: oimlsmart/smart
+          path: vendor/smart
+          token: ${{ secrets.METANORMA_CI_PAT_TOKEN }}
+
       - uses: actions/setup-node@v4
         with:
           node-version: 24
       - run: npm ci
-      - run: npm run build
+      - name: Build (the prebuild hook regenerates the model bundle)
+        run: npm run build
+        env:
+          SMART_REPO: vendor/smart
 
-      - name: Verify the page and the canonical logo asset
+      - name: Verify the page, the bundle, and the canonical logo asset
         run: |
           set -euo pipefail
           test -f dist/index.html
+          test -f dist/models/oiml-r60.prl
+          grep -q '^package {' dist/models/oiml-r60.prl
           grep -q "https://www.oimlsmart.org/img/components/" dist/index.html
           url=$(grep -o 'https://www.oimlsmart.org/img/components/[a-z-]*-light.svg' dist/index.html | head -1)
           code=$(curl -s -o /dev/null -w '%{http_code}' -L "$url")
@@ -43,11 +62,22 @@ jobs:
         with:
           repository: oimlsmart/site-shell
           path: vendor/site-shell
+
+      - name: Checkout the smart repo (the PRL packages SSOT)
+        uses: actions/checkout@v4
+        with:
+          repository: oimlsmart/smart
+          path: vendor/smart
+          token: ${{ secrets.METANORMA_CI_PAT_TOKEN }}
+
       - uses: actions/setup-node@v4
         with:
           node-version: 24
       - run: npm ci
-      - run: npm run build
+      - name: Build (the prebuild hook regenerates the model bundle)
+        run: npm run build
+        env:
+          SMART_REPO: vendor/smart
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
@@ -72,6 +102,11 @@ jobs:
 
       - name: Smoke-test /studio/edit
         run: node scripts/smoke-edit.mjs
+        env:
+          BASE_URL: http://localhost:4322
+
+      - name: Smoke-test /studio/view (the read-only viewer)
+        run: node scripts/smoke-view.mjs
         env:
           BASE_URL: http://localhost:4322
 

@@ -12,7 +12,7 @@ const NAV = [
 ]
 ---
 
-<Base title="SMART Studio — the editor" description="The canvas where an expert models an OIML SMART Recommendation.">
+<Base title="SMART Studio — the viewer" description="The read-only viewer over the published OIML SMART models: the tree, canvas, code, mapping lenses, diff and validation — no editing surface.">
   <MinisiteNav sections={NAV} base="/studio" />
   <div id="editor-root"></div>
   <script type="module">
@@ -27,11 +27,15 @@ const NAV = [
     } catch (e) {
       console.error('Failed to load model', model, e)
     }
+    // The viewer is the editor's readOnly mount: the store refuses every
+    // mutation and the editing chrome hides; the tree, canvas, code,
+    // mapping lenses, diff and validation stay.
     mount(document.getElementById('editor-root'), {
       initialText,
+      readOnly: true,
       brand: {
         name: 'OIML SMART',
-        sub: 'STUDIO',
+        sub: 'VIEWER',
         logoUrl: '/img/components/smart-studio-light.svg',
       },
     })

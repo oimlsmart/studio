@@ -6,26 +6,28 @@ const NAV = [
   { label: 'About', href: '/' },
   { label: 'Story', href: '/story' },
   { label: 'Docs', href: '/docs' },
+  { label: 'Demo', href: '/demo' },
+  { label: 'Viewer', href: '/view' },
   { label: 'Studio', href: '/edit' },
 ]
 ---
 
-<Base title="SMART Studio — demo" description="The SMART Studio editor mounts a model canvas at /studio/edit.">
+<Base title="SMART Studio — demo" description="The read-only viewer over the published R 60 model runs at /studio/view; the full editor mounts at /studio/edit.">
   <MinisiteNav sections={NAV} base="/studio" />
   <main class="max-w-3xl mx-auto px-6 py-14 docs-body">
     <p class="font-mono text-xs tracking-widest uppercase text-ink-muted mb-3">SMART Studio · Demo</p>
-    <h1 class="font-serif text-3xl font-semibold text-ink mb-6">The editor is mounted at /studio/edit</h1>
+    <h1 class="font-serif text-3xl font-semibold text-ink mb-6">The viewer is at /studio/view</h1>
 
-    <p>The Studio editor is the Primmel Studio editor — the model canvas, inspectors, mapper, document map, and review surface — mounted into this site at <a href="/studio/edit" class="text-accent">/studio/edit</a>. The editor source lives in the sibling <a href="https://github.com/primmel/editor" class="text-accent">primmel/editor</a> repo and is consumed here as <code>@primmel/editor</code> from npm.</p>
+    <p>The public surface is the <a href="/studio/view" class="text-accent">read-only viewer</a>: the Primmel Studio editor mounted with <code>readOnly</code> on — the model tree, the canvas, the Monaco code view, the mapping lenses, the diff view and the validation badge, with every editing surface (palette, save, import, inspector fields) off. The editor source lives in the sibling <a href="https://github.com/primmel/editor" class="text-accent">primmel/editor</a> repo, consumed here from its <code>main</code> branch until the next npm release carries the viewer mode.</p>
 
-    <h2>What's loaded by default</h2>
-    <p>The default model is the bundled OIML R 60 (load cells) Recommendation — <code>public/models/oiml-r60.prl</code>, regenerated from <code>smart/primmel-packages/oiml-r60/</code> via <code>scripts/bundle-model.mjs</code>. It exercises the editor's full surface: 31 processes, 180 requirements, 107 data classes, plus the OIML plugin's certificate preview and package manifest panels.</p>
+    <h2>What's loaded</h2>
+    <p>The model is the bundled OIML R 60 (load cells) Recommendation — served from <code>/studio/models/oiml-r60.prl</code>, regenerated <em>at build time</em> from the PRL source of truth (<code>smart/primmel-packages/oiml-r60/</code>, composed with its <code>uses</code> chain) by <code>scripts/bundle-model.mjs</code> running in the site build. The bundle is never committed, so this page can never go stale. It carries the full composition — 31 processes, 180 requirements, 180 data classes, 139 terms — plus the package manifest, so the OIML plugin's package-manifest panel and certificate preview activate.</p>
 
     <h2>Try it</h2>
     <ul>
-      <li><a href="/studio/edit" class="text-accent">Open the editor with the default R 60 model</a></li>
-      <li><a href="/studio/edit?model=/studio/models/oiml-r60.prl" class="text-accent">Same model via explicit <code>?model=</code></a></li>
-      <li>Drag elements from the palette onto the canvas; double-click a process to drill into its subprocess pages</li>
+      <li><a href="/studio/view" class="text-accent">Open the viewer on the R 60 model</a> — the read-only public surface</li>
+      <li><a href="/studio/view?model=/studio/models/oiml-r60.prl" class="text-accent">Same model via explicit <code>?model=</code></a></li>
+      <li><a href="/studio/edit" class="text-accent">The full editor at /studio/edit</a> — the authoring surface (palette, inspectors, save); edits stay local to your browser, nothing writes back to the published model</li>
     </ul>
 
     <h2>The authoring walkthrough</h2>
