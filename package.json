@@ -15,7 +15,7 @@
     "@astrojs/vue": "^7.0.0",
     "@oimlsmart/oiml-pubid": "github:oimlsmart/oiml-pubid#main",
     "@oimlsmart/site-shell": "file:vendor/site-shell",
-    "@primmel/editor": "github:primmel/editor#main",
+    "@primmel/editor": "^0.4.0",
     "@primmel/primmel": "^1.6.1",
     "@tailwindcss/vite": "^4.0.0",
     "astro": "^7.0.7",
