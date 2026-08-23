@@ -38,19 +38,25 @@ locally with a missing-shell error, this is why.
 ### The model bundle
 
 Both editor surfaces load `/studio/models/oiml-r60.prl` — a server-side
-bundle of the R60 Recommendation package. **The bundle is a build
-artifact and is never committed** (`public/models/` is gitignored);
-`scripts/bundle-model.mjs` runs on `prebuild`/`predev`. It composes the
-package with `uses` resolution from `$SMART_REPO/primmel-packages`
-(default `~/src/oimlsmart/smart`; CI checks oimlsmart/smart out at
-`vendor/smart` and sets `SMART_REPO`) using this repo's own npm-pinned
+bundle of the R60 Recommendation package, committed and refreshed by
+`scripts/bundle-model.mjs` (wired to `prebuild`/`predev`). It composes
+the package with `uses` resolution from `$SMART_REPO/primmel-packages`
+(default `~/src/oimlsmart/smart`) using this repo's own npm-pinned
 kernel, then prepends the package's `package.primmel` (the merge's
 `dump()` carries no `package { }` block, and the editor's manifest panel
 needs the identity). Composition failure is fatal — the old
-load-without-deps fallback once silently shipped a partial model. On CI
-a missing packages root is fatal; locally it is a loud skip so docs-only
-clones can still build. Browser builds of the kernel can't resolve
-`include` directives (no fs), so bundling stays server-side.
+load-without-deps fallback once silently shipped a partial model. A
+missing packages root is fatal when `SMART_REPO` is declared
+(misconfiguration, said out loud), a loud skip otherwise (the committed
+bundle serves). Browser builds of the kernel can't resolve `include`
+directives (no fs), so bundling stays server-side.
+
+Freshness: the `bundle-freshness` CI job regenerates from a smart
+checkout and diffs byte-identical against the committed bundle. The
+smart repo is private, so the job is gated on repo variable
+`SMART_REPO_AVAILABLE` + secret `SMART_REPO_PAT` (the
+oimlsmart.github.io gates.yml pattern) and skips cleanly until
+configured.
 
 ## Architecture
 

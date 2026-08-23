@@ -4,18 +4,19 @@
 // multi-file Primmel package (with its `uses` deps) into the single
 // .prl the editor loads, SERVER-SIDE (composition needs Node's fs).
 //
-// Runs at build time (npm run prebuild / predev), never by hand: the
-// bundle is a build artifact and is NEVER committed (public/models/ is
-// gitignored) — a committed bundle went stale within days twice
-// (audit: PROGRESS/39 §G).
+// Runs at build time (npm run prebuild / predev). The bundle IS
+// committed (public/models/): the packages SSOT (oimlsmart/smart) is
+// private, so CI freshness rides the `bundle-freshness` job in ci.yml —
+// regenerate + byte-identical diff, gated on the SMART_REPO_AVAILABLE
+// variable (the oimlsmart.github.io gates.yml pattern).
 //
 // Inputs:
 //   - the kernel is the studio's own @primmel/primmel dependency
 //     (npm-pinned by the lockfile — deterministic), NOT a local
 //     primmel-ts checkout;
 //   - the packages root is $SMART_REPO/primmel-packages (default
-//     ~/src/oimlsmart/smart — the PRL SSOT; CI checks the repo out at
-//     vendor/smart and sets SMART_REPO).
+//     ~/src/oimlsmart/smart — the PRL SSOT; CI sets SMART_REPO to its
+//     checkout).
 //
 // Honesty rules:
 //   - composition failure is FATAL (the old "load without deps"
@@ -24,8 +25,9 @@
 //     the dump: the merge loses the package identity (the kernel's dump
 //     emits no `package { }` block), and without it the editor's
 //     manifest panel cannot activate;
-//   - a missing packages root is fatal on CI (process.env.CI), a loud
-//     skip locally, so docs-only clones can still dev/build.
+//   - a missing packages root when SMART_REPO is DECLARED is fatal (a
+//     misconfiguration, said out loud); undeclared means "no smart
+//     checkout here" — warn and keep the committed bundle.
 // ─────────────────────────────────────────────────────────────────────
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs'
@@ -41,12 +43,12 @@ const TARGET = process.argv[2] || 'oiml-r60'
 const OUT = process.argv[3] || resolve(STUDIO_ROOT, 'public', 'models', `${TARGET}.prl`)
 
 if (!existsSync(PKGS_ROOT)) {
-  const msg = `packages root not found: ${PKGS_ROOT} (set SMART_REPO to the oimlsmart/smart checkout)`
-  if (process.env.CI) {
-    console.error(`FATAL: ${msg} — the CI build must never ship without the bundle`)
+  const msg = `packages root not found: ${PKGS_ROOT}`
+  if (process.env.SMART_REPO) {
+    console.error(`FATAL: ${msg} — SMART_REPO is declared but does not resolve; fix the checkout`)
     process.exit(1)
   }
-  console.warn(`WARN: ${msg} — skipping the bundle regeneration (local dev without the smart checkout)`)
+  console.warn(`WARN: ${msg} — no smart checkout declared (set SMART_REPO to enable); keeping the committed bundle`)
   process.exit(0)
 }
 

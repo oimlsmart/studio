@@ -24,25 +24,11 @@ jobs:
         with:
           repository: oimlsmart/site-shell
           path: vendor/site-shell
-
-      # Same contract as ci.yml: the bundle regenerates at build time
-      # from the PRL packages SSOT (oimlsmart/smart, private — the org's
-      # read PAT, visibility: all), main-tracking, never committed.
-      - name: Checkout the smart repo (the PRL packages SSOT)
-        uses: actions/checkout@v4
-        with:
-          repository: oimlsmart/smart
-          path: vendor/smart
-          token: ${{ secrets.METANORMA_CI_PAT_TOKEN }}
-
       - uses: actions/setup-node@v4
         with:
           node-version: 24
       - run: npm ci
-      - name: Build (the prebuild hook regenerates the model bundle)
-        run: npm run build
-        env:
-          SMART_REPO: vendor/smart
+      - run: npm run build
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
