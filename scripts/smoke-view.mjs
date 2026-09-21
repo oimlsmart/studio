@@ -55,8 +55,10 @@ check('no page add button', await gone('[data-testid="page-add"]'))
 check('no comment compose', await gone('[data-testid="comment-input"]'))
 check('the read-only badge shows', (await page.locator('[data-testid="readonly-badge"]').count()) === 1)
 
-// 3. The model still loads (the real bundle, not the sample).
-const statsMatch = bodyText.match(/(\d+)\s+processes\s+(\d+)\s+provisions\s+(\d+)\s+canvases/)
+// 3. The model still loads (the real bundle, not the sample). The middle
+//    pill is the compliance surface: provisions on legacy models, the
+//    requirements count on v3 packages (editor wave 03, audit G6).
+const statsMatch = bodyText.match(/(\d+)\s+processes\s+(\d+)\s+(provisions|requirements)\s+(\d+)\s+canvases/)
 if (statsMatch) {
   const [, procs] = statsMatch.map(Number)
   check('stats pill shows the real model (processes > 3)', procs > 3, `processes=${procs}`)
