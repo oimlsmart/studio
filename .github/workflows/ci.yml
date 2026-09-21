@@ -20,9 +20,10 @@ jobs:
         with:
           node-version: 24
       - run: npm ci
-      # The prebuild hook regenerates the model bundle when a smart
-      # checkout is present (local devs); with none declared it keeps the
-      # committed bundle. The freshness gate is the bundle-freshness job.
+      # The prebuild hook regenerates the model bundle from the pinned
+      # @oimlsmart/primmel-packages dependency on every run — local and
+      # CI build from the same npm-pinned content. The freshness gate is
+      # the bundle-freshness job.
       - run: npm run build
 
       - name: Verify the page, the bundle, and the canonical logo asset
@@ -90,20 +91,13 @@ jobs:
         run: npx astro preview stop || true
 
   bundle-freshness:
-    # The SSOT freshness gate (the oimlsmart.github.io gates.yml
-    # pattern): regenerates the model bundle from the PRIVATE
-    # oimlsmart/smart repository and diffs it byte-identical against the
-    # committed one. GitHub Actions can only check that repo out when a
-    # PAT is configured:
-    #
-    #   1. create a fine-grained PAT with read access to oimlsmart/smart
-    #   2. add it as secret  SMART_REPO_PAT
-    #   3. set repo variable SMART_REPO_AVAILABLE = true
-    #
-    # Until then this job skips cleanly; the regeneration still runs
-    # locally wherever both repos are checked out side by side
-    # (node scripts/bundle-model.mjs, then commit the result).
-    if: ${{ vars.SMART_REPO_AVAILABLE == 'true' }}
+    # The SSOT freshness gate: regenerates the model bundle from the
+    # PINNED @oimlsmart/primmel-packages dependency (the version pin in
+    # package.json IS the content contract) and diffs it byte-identical
+    # against the committed one. Runs unconditionally — the pinned
+    # package is public on npm, so no PAT, no checkout of a private
+    # repo, no skip switch. A content change lands by a deliberate
+    # version bump (regenerate locally, commit the fresh bundle).
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -113,13 +107,6 @@ jobs:
         with:
           repository: oimlsmart/site-shell
           path: vendor/site-shell
-
-      - name: Check out the smart repo (the PRL packages SSOT)
-        uses: actions/checkout@v4
-        with:
-          repository: oimlsmart/smart
-          path: vendor/smart
-          token: ${{ secrets.SMART_REPO_PAT }}
 
       - uses: actions/setup-node@v4
         with:
@@ -131,5 +118,3 @@ jobs:
           set -euo pipefail
           node scripts/bundle-model.mjs oiml-r60 "$RUNNER_TEMP/fresh-bundle.prl"
           diff -q "$RUNNER_TEMP/fresh-bundle.prl" public/models/oiml-r60.prl
-        env:
-          SMART_REPO: vendor/smart

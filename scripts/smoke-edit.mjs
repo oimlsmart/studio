@@ -42,9 +42,11 @@ const bodyText = await page.locator('body').innerText()
 check('OIML SMART STUDIO brand present', /OIML SMART\s+STUDIO/.test(bodyText))
 check('default Primmel Atelier brand overridden', !/Primmel\s+Atelier/.test(bodyText))
 
-const statsMatch = bodyText.match(/(\d+)\s+processes\s+(\d+)\s+provisions\s+(\d+)\s+canvases/)
+// The middle pill is the compliance surface: provisions on legacy
+// models, the requirements count on v3 packages (editor wave 03, G6).
+const statsMatch = bodyText.match(/(\d+)\s+processes\s+(\d+)\s+(provisions|requirements)\s+(\d+)\s+canvases/)
 if (statsMatch) {
-  const [, procs, provs, canv] = statsMatch.map(Number)
+  const [, procs] = statsMatch.map(Number)
   check(`stats pill shows real model (processes > 3, not sample)`, procs > 3, `processes=${procs}`)
 } else {
   check('stats pill visible', false, 'no match in body')

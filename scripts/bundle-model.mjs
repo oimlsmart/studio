@@ -1,62 +1,96 @@
 #!/usr/bin/env node
 // ─────────────────────────────────────────────────────────────────────
 // The model bundler (the viewer wave, smart TODO.editor/04): compose a
-// multi-file Primmel package (with its `uses` deps) into the single
-// .prl the editor loads, SERVER-SIDE (composition needs Node's fs).
+// multi-file Primmel package into the single .prl the editor loads,
+// SERVER-SIDE (the include expansion needs Node's fs).
 //
 // Runs at build time (npm run prebuild / predev). The bundle IS
-// committed (public/models/): the packages SSOT (oimlsmart/smart) is
-// private, so CI freshness rides the `bundle-freshness` job in ci.yml —
-// regenerate + byte-identical diff, gated on the SMART_REPO_AVAILABLE
-// variable (the oimlsmart.github.io gates.yml pattern).
+// committed (public/models/): CI freshness rides the `bundle-freshness`
+// job in ci.yml — regenerate + byte-identical diff, unconditionally.
 //
 // Inputs:
 //   - the kernel is the studio's own @primmel/primmel dependency
 //     (npm-pinned by the lockfile — deterministic), NOT a local
 //     primmel-ts checkout;
-//   - the packages root is $SMART_REPO/primmel-packages (default
-//     ~/src/oimlsmart/smart — the PRL SSOT; CI sets SMART_REPO to its
-//     checkout).
+//   - the packages root is the pinned @oimlsmart/primmel-packages
+//     dependency (the version pin IS the content contract — the
+//     package's root IS the packages root, one child directory per PRL
+//     package). PRIMMEL_PACKAGES_ROOT overrides it with a content-repo
+//     checkout for authoring previews.
+//
+// The target package is loaded STANDALONE: the rec packages are
+// self-contained under the layers.prl doctrine — the generated file
+// includes the consumed layer files verbatim and the kernel's include
+// preprocessor expands them before parsing, so a plain package load IS
+// the composed model. (A resolvePackage closure merge over the manifest
+// `uses` would double-count the layer content and collide with it —
+// uses-no-redefine.) The manifest `uses` stays in the bundle as
+// lineage, not as a merge instruction.
 //
 // Honesty rules:
-//   - composition failure is FATAL (the old "load without deps"
-//     fallback silently shipped a partial model once — never again);
+//   - load failure is FATAL (the old "load without deps" fallback
+//     silently shipped a partial model once — never again);
 //   - the target package's manifest (package.primmel) is PREPENDED to
 //     the dump: the merge loses the package identity (the kernel's dump
 //     emits no `package { }` block), and without it the editor's
 //     manifest panel cannot activate;
-//   - a missing packages root when SMART_REPO is DECLARED is fatal (a
-//     misconfiguration, said out loud); undeclared means "no smart
-//     checkout here" — warn and keep the committed bundle.
+//   - a missing packages root is FATAL, said out loud: a declared
+//     PRIMMEL_PACKAGES_ROOT that does not resolve is a misconfiguration,
+//     and an undeclared one means the pinned package is not installed
+//     (npm ci is the fix).
 // ─────────────────────────────────────────────────────────────────────
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createRequire } from 'node:module'
 import { loadPackage, dump } from '@primmel/primmel'
 
 const STUDIO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const SMART_REPO = resolve(process.env.SMART_REPO ?? `${homedir()}/src/oimlsmart/smart`)
-const PKGS_ROOT = resolve(SMART_REPO, 'primmel-packages')
 const TARGET = process.argv[2] || 'oiml-r60'
 const OUT = process.argv[3] || resolve(STUDIO_ROOT, 'public', 'models', `${TARGET}.prl`)
 
-if (!existsSync(PKGS_ROOT)) {
-  const msg = `packages root not found: ${PKGS_ROOT}`
-  if (process.env.SMART_REPO) {
-    console.error(`FATAL: ${msg} — SMART_REPO is declared but does not resolve; fix the checkout`)
+// The packages root: the override first (a content-repo checkout for
+// authoring previews; missing = fatal), the pinned npm package second
+// (not installed = fatal).
+function packagesRoot() {
+  const override = process.env.PRIMMEL_PACKAGES_ROOT
+  if (override) {
+    if (!existsSync(override)) {
+      console.error(`FATAL: PRIMMEL_PACKAGES_ROOT=${override} does not exist — point it at a checkout of oimlsmart/primmel-packages (or unset it to use the pinned npm package)`)
+      process.exit(1)
+    }
+    return { root: override }
+  }
+  try {
+    const req = createRequire(import.meta.url)
+    const manifest = req.resolve('@oimlsmart/primmel-packages/package.json')
+    const pkg = JSON.parse(readFileSync(manifest, 'utf8'))
+    return { root: dirname(manifest), name: pkg.name, version: pkg.version }
+  } catch {
+    console.error('FATAL: @oimlsmart/primmel-packages is not installed — run npm ci (the pinned content package the bundle is built from)')
     process.exit(1)
   }
-  console.warn(`WARN: ${msg} — no smart checkout declared (set SMART_REPO to enable); keeping the committed bundle`)
-  process.exit(0)
 }
 
-// Provenance for the CI log: which SSOT revision this bundle carries.
-try {
-  const sha = execFileSync('git', ['-C', SMART_REPO, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
-  console.log(`bundling from oimlsmart/smart @ ${sha}`)
-} catch {
+const source = packagesRoot()
+const PKGS_ROOT = source.root
+
+// Provenance for the CI log: which content revision this bundle carries.
+// A checkout answers git; the installed npm package answers name@version.
+// (The .git probe must be explicit: the installed package sits INSIDE
+// this repo's work tree, so a bare `git -C` would answer with the
+// studio's own HEAD.)
+if (existsSync(resolve(PKGS_ROOT, '.git'))) {
+  try {
+    const sha = execFileSync('git', ['-C', PKGS_ROOT, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+    console.log(`bundling from oimlsmart/primmel-packages @ ${sha}`)
+  } catch {
+    console.log(`bundling from ${PKGS_ROOT} (checkout exists, revision unreadable)`)
+  }
+} else if (source.name) {
+  console.log(`bundling from ${source.name}@${source.version}`)
+} else {
   console.log(`bundling from ${PKGS_ROOT} (not a git checkout — no revision to log)`)
 }
 
@@ -69,9 +103,9 @@ if (!existsSync(manifestPath)) {
 
 let standard
 try {
-  standard = loadPackage(pkgDir, { resolvePackage: (id) => resolve(PKGS_ROOT, id) })
+  standard = loadPackage(pkgDir)
 } catch (e) {
-  console.error(`FATAL: the uses composition failed for ${TARGET}: ${e.message}`)
+  console.error(`FATAL: the package load failed for ${TARGET}: ${e.message}`)
   process.exit(1)
 }
 
