@@ -112,11 +112,15 @@ SMART STUDIO" / "OIML SMART VIEWER"), `readOnly` mounts the viewer.
 ### Content collection
 
 `src/content.config.ts` defines a single `docs` collection, loaded via
-`astro/loaders`' `glob` from `src/content/docs/**/*.mdx`. The 14 chapter
-files live under `src/content/docs/guides/`. Schema: `title`,
+`astro/loaders`' `glob` from `src/content/docs/**/*.mdx`. The guide
+files live under `src/content/docs/guides/`: the quickstart and the
+Primmel Studio chapter. (The twelve YAML-pipeline guides retired when
+the packages became the single source of truth; the authoring pipeline
+is documented once, in the SMART Recommendations corpus at
+www.oimlsmart.org/recs/docs/.) Schema: `title`,
 `shortTitle`, `description`, `eyebrow`, `sidebar`, `order`. Sidebar
 order is `order`-sorted; `eyebrow` renders as the chapter index
-("Guide · 03 of 14").
+("Guide · 01 of 02").
 
 ### Styling
 

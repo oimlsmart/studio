@@ -14,7 +14,6 @@ const NAV = [
 const allDocs = await getCollection('docs')
 const chapters = allDocs.filter(d => d.id.startsWith('guides/') && true)
   .sort((a, b) => (a.data.order ?? 99) - (b.data.order ?? 99))
-const overview = allDocs.find(d => d.id === 'oiml-rec/overview')
 ---
 
 <Base title="Studio guides" description="The SMART Studio guides.">
@@ -22,14 +21,14 @@ const overview = allDocs.find(d => d.id === 'oiml-rec/overview')
   <div class="max-w-7xl mx-auto px-6 py-10 grid gap-10 lg:grid-cols-[16rem_1fr]">
     <aside><DocsSidebar order={['guides']} labels={{ 'guides': 'Studio Guides' }} hrefBase="/studio/docs/" /></aside>
     <main class="docs-body">
-      <p class="font-mono text-xs tracking-widest uppercase text-ink-muted mb-3">SMART Recommendations · Docs</p>
+      <p class="font-mono text-xs tracking-widest uppercase text-ink-muted mb-3">SMART Studio · Docs</p>
       <h1 class="font-serif text-3xl font-semibold text-ink mb-6">The SMART Studio guides</h1>
-      {overview && <p class="text-ink-soft mb-6">{overview.data.description ?? 'The authoring corpus: method, subjects, requirements, tests, forms, packaging, walkthroughs.'} Start with the overview, then the chapters in order.</p>}
+      <p class="text-ink-soft mb-6">Two guides cover the Studio: the quickstart opens the viewer and the editor, and the architecture guide explains how the Studio serves the SMART Recommendation packages in the browser. The authoring corpus for the Recommendations themselves lives with the Recommendations site.</p>
       <ul class="mt-4 space-y-3">
-        {overview && <li><a class="text-accent font-medium" href="/recs/docs/oiml-rec/overview">Overview — the corpus map</a></li>}
         {chapters.map(d => (
-          <li><a class="text-accent font-medium" href={`/recs/docs/${d.id}`}>{d.data.shortTitle ?? d.data.title ?? d.id.split('/').pop()}</a>{d.data.description ? <span class="text-ink-soft"> — {d.data.description}</span> : null}</li>
+          <li><a class="text-accent font-medium" href={`/studio/docs/${d.id}`}>{d.data.shortTitle ?? d.data.title ?? d.id.split('/').pop()}</a>{d.data.description ? <span class="text-ink-soft"> — {d.data.description}</span> : null}</li>
         ))}
+        <li><a class="text-accent font-medium" href="https://www.oimlsmart.org/recs/docs/">The SMART Recommendations authoring corpus</a><span class="text-ink-soft"> — the method, the subjects, the requirements, the tests, the forms, the packaging, and the walkthroughs, on the Recommendations site.</span></li>
       </ul>
     </main>
   </div>
