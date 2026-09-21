@@ -23,17 +23,20 @@ option); flip to the published `^0.4.0` then. The Primmel kernel
 npm run dev       # Astro dev server
 npm run build     # Astro static build → dist/
 npm run preview   # Serve the built site
+npm run check:nav # Nav completeness gate against the built dist/
 ```
 
 Astro 7, static output, `base: '/studio'`. Node 24 in CI.
 
-### The vendor/site-shell caveat
+### The shell pin
 
-`@oimlsmart/site-shell` is declared as `"file:vendor/site-shell"` and
-`vendor/` is **gitignored**. Locally you must populate it (clone
-`oimlsmart/site-shell` into `vendor/site-shell`). CI re-checks it from
-GitHub as a separate workflow step before `npm ci`. If `npm ci` fails
-locally with a missing-shell error, this is why.
+`@oimlsmart/site-shell` is pinned to the exact published version
+(`"0.2.0"`) — the version pin IS the contract. The package ships
+machinery only (chrome components, tokens, the config contract): every
+piece of site content — nav model, brand, services, footer — is this
+repo's own, living in `src/data/` and injected through
+`src/layouts/Site.astro`, the one mount of the shell's `Base`. The old
+`file:vendor/site-shell` channel and its CI checkout steps are gone.
 
 ### The model bundle
 
@@ -64,20 +67,34 @@ configured.
 
 Page chrome — federation header, minisite nav, hero, docs sidebar,
 footer, design tokens — comes from `@oimlsmart/site-shell`. Consumers
-import components and the token CSS; they don't redefine chrome. In
-particular:
+import components and the token CSS; they don't redefine chrome. The
+package renders exactly what `src/layouts/Site.astro` injects and
+invents nothing (`TODO.public track 02`):
 
+- **The nav model (`src/data/nav-config.ts`) is the site's own.** The
+  header menu, the mobile overlay, and the footer's Explore column
+  render from it; it carries the site's own routes only — cross-site
+  navigation lives in the footer (the Programme column and the hosts
+  registry). The file is data-only with explicit `.ts` relative
+  imports, because the nav completeness gate
+  (`npm run check:nav`, wired into ci.yml after the build) loads it
+  under plain node's type stripping. New routes join the model, the
+  strip's `MINISITE_SECTIONS`, and the page tree together.
 - **Logos are not shipped.** Mark-up references canonical URLs under
   `/img/components/` (root-relative, served by the main oimlsmart.org
-  site). The CI build greps `dist/index.html` for that prefix and curls
-  the resolved SVG to confirm a 200 — the "sync-branding" guard.
+  site) through the injected asset base; the CI build greps
+  `dist/index.html` for that prefix and curls the resolved SVG to
+  confirm a 200 — the "sync-branding" guard. The brand config
+  (`src/data/brand.ts`) reuses the same canonical pair; the studio
+  serves no authenticated surface, so it declares no sign-in href.
 - **Colors and type live only in the shell's `tokens.css`.** A token
   change ships as one shell release consumed by every site.
 
 ### Page layout
 
-Six top-level pages, each a thin Astro file wrapping content in
-`<Base>` + `<MinisiteNav>` with the 6-item nav:
+Six top-level pages, each a thin Astro file wrapping content in the
+site layout (`src/layouts/Site.astro` — the one injection point for
+the shell's chrome: federation header, minisite strip, footer):
 
 - `src/pages/index.astro` — About / hero
 - `src/pages/story.astro` — narrative

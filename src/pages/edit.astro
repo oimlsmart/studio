@@ -1,19 +1,8 @@
 ---
-import { Base, MinisiteNav } from '@oimlsmart/site-shell'
-import '../styles/app.css'
-
-const NAV = [
-  { label: 'About', href: '/' },
-  { label: 'Story', href: '/story' },
-  { label: 'Docs', href: '/docs' },
-  { label: 'Demo', href: '/demo' },
-  { label: 'Viewer', href: '/view' },
-  { label: 'Studio', href: '/edit' },
-]
+import Site from '../layouts/Site.astro'
 ---
 
-<Base title="SMART Studio — the editor" description="The canvas where an expert models an OIML SMART Recommendation.">
-  <MinisiteNav sections={NAV} base="/studio" />
+<Site title="SMART Studio — the editor" description="The canvas where an expert models an OIML SMART Recommendation.">
   <div id="editor-root"></div>
   <script type="module">
     import { mount } from '@primmel/editor'
@@ -36,4 +25,4 @@ const NAV = [
       },
     })
   </script>
-</Base>
+</Site>

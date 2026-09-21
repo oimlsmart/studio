@@ -1,25 +1,16 @@
 ---
-import { Base, MinisiteNav, PageHero } from '@oimlsmart/site-shell'
-import '../styles/app.css'
-
-const NAV = [
-  { label: 'About', href: '/' },
-  { label: 'Story', href: '/story' },
-  { label: 'Docs', href: '/docs' },
-  { label: 'Demo', href: '/demo' },
-  { label: 'Viewer', href: '/view' },
-  { label: 'Studio', href: '/edit' },
-]
+import Site from '../layouts/Site.astro'
+import PageHero from '@oimlsmart/site-shell/chrome/astro/PageHero.astro'
+import { COMPONENT_ASSET_BASE } from '../data/site-meta'
 ---
 
-<Base title="SMART Studio" description="OIML SMART Studio — the tool for viewing and authoring SMART Recommendations.">
-  <MinisiteNav sections={NAV} base="/studio" />
+<Site title="SMART Studio" description="OIML SMART Studio — the tool for viewing and authoring SMART Recommendations.">
   <main class="max-w-4xl mx-auto px-6 py-14">
     <PageHero
       eyebrow="OIML SMART · Component 2"
       title="SMART Studio"
       lede="The canvas where an expert models a Recommendation and the model itself is the published artifact — versioned, validated, and citable back to the source document."
-      logo={{ name: 'smart-studio', alt: 'The SMART Studio logo.' }}
+      logo={{ name: 'smart-studio', alt: 'The SMART Studio logo.', base: COMPONENT_ASSET_BASE }}
     />
     <section class="mt-10 grid gap-6 md:grid-cols-2">
       <div class="border border-rule rounded-lg p-6 bg-paper-raised">
@@ -41,4 +32,4 @@ const NAV = [
     </section>
     <p class="mt-10 text-sm"><a href="/studio/docs/" class="text-accent font-medium">Read the Studio guides →</a></p>
   </main>
-</Base>
+</Site>

@@ -1,19 +1,8 @@
 ---
-import { Base, MinisiteNav } from '@oimlsmart/site-shell'
-import '../styles/app.css'
-
-const NAV = [
-  { label: 'About', href: '/' },
-  { label: 'Story', href: '/story' },
-  { label: 'Docs', href: '/docs' },
-  { label: 'Demo', href: '/demo' },
-  { label: 'Viewer', href: '/view' },
-  { label: 'Studio', href: '/edit' },
-]
+import Site from '../layouts/Site.astro'
 ---
 
-<Base title="SMART Studio — demo" description="The read-only viewer over the published R 60 model runs at /studio/view; the full editor mounts at /studio/edit.">
-  <MinisiteNav sections={NAV} base="/studio" />
+<Site title="SMART Studio — demo" description="The read-only viewer over the published R 60 model runs at /studio/view; the full editor mounts at /studio/edit.">
   <main class="max-w-3xl mx-auto px-6 py-14 docs-body">
     <p class="font-mono text-xs tracking-widest uppercase text-ink-muted mb-3">SMART Studio · Demo</p>
     <h1 class="font-serif text-3xl font-semibold text-ink mb-6">The viewer is at /studio/view</h1>
@@ -36,4 +25,4 @@ const NAV = [
     <h2>Published results</h2>
     <p>The authored Recommendations are public even where iteration isn't: the <a href="https://www.oimlsmart.org/recs/" class="text-accent">SMART Recommendations</a> published from Studio, and the <a href="https://www.oimlsmart.org/sst/" class="text-accent">simulated instruments</a> the models drive.</p>
   </main>
-</Base>
+</Site>

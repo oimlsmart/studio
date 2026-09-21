@@ -37,8 +37,10 @@ npm release carries the viewer mode; flip to the published `^0.4.0` then.
 
 ## CI
 
-`ci.yml` builds and smokes `/studio/edit` and `/studio/view` (playwright, in
-`scripts/smoke-edit.mjs` / `scripts/smoke-view.mjs`). `deploy.yml` publishes
-`dist/` to GitHub Pages on merge to main.
+`ci.yml` builds, runs the nav completeness gate (`npm run check:nav` —
+every href in the nav model must resolve to a page in the built dist),
+and smokes `/studio/edit` and `/studio/view` (playwright, in
+`scripts/smoke-edit.mjs` / `scripts/smoke-view.mjs`). `deploy.yml`
+publishes `dist/` to GitHub Pages on merge to main.
 
 Part of OIML SMART. Developed under the OIML SMART program by Ribose.

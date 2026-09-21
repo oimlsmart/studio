@@ -8,13 +8,14 @@
     "dev": "astro dev",
     "prebuild": "node scripts/bundle-model.mjs",
     "build": "astro build",
-    "preview": "astro preview"
+    "preview": "astro preview",
+    "check:nav": "node scripts/check-nav.mjs"
   },
   "dependencies": {
     "@astrojs/mdx": "^7.0.2",
     "@astrojs/vue": "^7.0.0",
     "@oimlsmart/oiml-pubid": "github:oimlsmart/oiml-pubid#main",
-    "@oimlsmart/site-shell": "file:vendor/site-shell",
+    "@oimlsmart/site-shell": "0.2.0",
     "@primmel/editor": "^0.4.1",
     "@primmel/primmel": "^1.18.0",
     "@tailwindcss/vite": "^4.0.0",
