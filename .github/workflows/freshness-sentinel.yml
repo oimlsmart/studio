@@ -1,0 +1,138 @@
+name: freshness-sentinel
+
+# The viewer's never-stale-again sentinel (smart PROGRESS/56): the
+# 2026-08-23 → 2026-09-21 silent-staleness incident proved that a
+# deliberate pin still drifts in TIME — nobody learns the viewer is a
+# month behind until a human notices. This nightly probe converts that
+# silence into a standing issue:
+#
+#   1. PIN LAG — the pinned @oimlsmart/primmel-packages must equal
+#      npm's latest. A newer content release means the viewer is
+#      behind; the bump is a deliberate PR, but the lag is never
+#      invisible.
+#   2. KERNEL FLOOR — the installed @primmel/primmel must satisfy the
+#      packages' declared peer floor (>=1.18.0 since 0.24.2). The
+#      1.6.1-vs-1.18 compose failure class, caught at check time.
+#   3. REGENERATION — a fresh bundle must byte-equal the committed
+#      one (the same proof ci.yml's bundle-freshness job makes on
+#      every push; here it guards the artifact against time).
+#   4. LIVE SMOKE — smoke-view against https://www.oimlsmart.org
+#      catches a DEPLOYED regression, the half the push-time gates
+#      cannot see.
+#
+# The report half rides the identity-heartbeat pattern (a standing
+# issue gets the run link; the first failure opens it) plus the
+# recovery half the pattern taught by omission: a green probe CLOSES
+# the standing issue with the evidence, so a self-healed red never
+# goes stale.
+
+on:
+  schedule:
+    # Nightly, on an off-herd minute.
+    - cron: '41 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: freshness-sentinel
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: The packages pin equals npm's latest
+        run: |
+          PIN=$(node -p "require('./package.json').devDependencies['@oimlsmart/primmel-packages']")
+          LATEST=$(npm view @oimlsmart/primmel-packages version) || { echo "::error::npm view failed — the registry did not answer"; exit 1; }
+          echo "pinned: $PIN · npm latest: $LATEST"
+          if [ "$PIN" != "$LATEST" ]; then
+            echo "::error::the viewer is behind the content: pinned $PIN, npm carries $LATEST — the deliberate pin-bump PR is owed"
+            exit 1
+          fi
+
+      - name: The installed kernel satisfies the packages' peer floor
+        run: |
+          FLOOR=$(node -p "(require('./node_modules/@oimlsmart/primmel-packages/package.json').peerDependencies || {})['@primmel/primmel'] || ''")
+          INSTALLED=$(node -p "require('./node_modules/@primmel/primmel/package.json').version")
+          echo "floor: ${FLOOR:-none declared} · installed: $INSTALLED"
+          if [ -n "$FLOOR" ]; then
+            npx --yes semver@7 -r "$FLOOR" "$INSTALLED" > /dev/null || { echo "::error::kernel $INSTALLED does not satisfy the packages' floor $FLOOR — the content cannot parse under this kernel"; exit 1; }
+          fi
+
+      - name: A fresh bundle byte-equals the committed one
+        run: |
+          node scripts/bundle-model.mjs
+          git diff --exit-code public/models/ || { echo "::error::a fresh regeneration differs from the committed bundle"; exit 1; }
+
+      - name: Live smoke — the deployed viewer
+        run: node scripts/smoke-view.mjs
+        env:
+          BASE_URL: https://www.oimlsmart.org
+
+  report-failure:
+    # One honest summary per failed run: the standing issue gets the
+    # run link appended; the first failure opens it.
+    if: failure()
+    needs: [probe]
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const title = 'Studio freshness sentinel failing — the viewer may be behind the content or the live site drifting'
+            const body = `The freshness-sentinel run of ${new Date().toISOString()} failed: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}\n\nThe failing step is named in the run log: the pin lag (a content release is unconsumed), the kernel floor (the installed kernel cannot parse the content), the regeneration byte-check, or the live smoke. The deliberate pin-bump PR is the fix; scripts/bundle-model.mjs regenerates the bundle.`
+            const { data: listed } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo, state: 'open', labels: [], per_page: 100,
+            })
+            const standing = listed.find(i => i.title === title && !i.pull_request)
+            if (standing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo, issue_number: standing.number, body,
+              })
+            } else {
+              await github.rest.issues.create({ owner: context.repo.owner, repo: context.repo.repo, title, body })
+            }
+
+  report-recovery:
+    # The recovery half the alert pattern taught by omission: a green
+    # probe closes the standing issue with the evidence, so a
+    # self-healed red never goes stale.
+    if: success()
+    needs: [probe]
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const title = 'Studio freshness sentinel failing — the viewer may be behind the content or the live site drifting'
+            const { data: listed } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo, state: 'open', labels: [], per_page: 100,
+            })
+            const standing = listed.find(i => i.title === title && !i.pull_request)
+            if (standing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo, issue_number: standing.number,
+                body: `Recovered: the freshness-sentinel run of ${new Date().toISOString()} is green — ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId} (the pin equals npm's latest, the kernel satisfies the floor, the regeneration byte-equals the committed bundle, the live smoke passes).`,
+              })
+              await github.rest.issues.update({
+                owner: context.repo.owner, repo: context.repo.repo, issue_number: standing.number, state: 'closed',
+              })
+            }
