@@ -1,19 +1,8 @@
 ---
-import { Base, MinisiteNav } from '@oimlsmart/site-shell'
-import '../styles/app.css'
-
-const NAV = [
-  { label: 'About', href: '/' },
-  { label: 'Story', href: '/story' },
-  { label: 'Docs', href: '/docs' },
-  { label: 'Demo', href: '/demo' },
-  { label: 'Viewer', href: '/view' },
-  { label: 'Studio', href: '/edit' },
-]
+import Site from '../layouts/Site.astro'
 ---
 
-<Base title="The story" description="From the MMEL editor to Primmel Studio.">
-  <MinisiteNav sections={NAV} base="/studio" />
+<Site title="The story" description="From the MMEL editor to Primmel Studio.">
   <main class="max-w-3xl mx-auto px-6 py-14 docs-body">
     <p class="font-mono text-xs tracking-widest uppercase text-ink-muted mb-3">SMART Studio · Story</p>
     <h1 class="font-serif text-3xl font-semibold text-ink mb-6">From the MMEL editor to Primmel Studio</h1>
@@ -30,4 +19,4 @@ const NAV = [
 
     <p class="mt-8"><a href="/studio/docs/" class="text-accent font-medium">The Studio guides walk each surface →</a></p>
   </main>
-</Base>
+</Site>

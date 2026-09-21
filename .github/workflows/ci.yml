@@ -11,11 +11,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Checkout the shell package (the chrome SSOT)
-        uses: actions/checkout@v4
-        with:
-          repository: oimlsmart/site-shell
-          path: vendor/site-shell
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -25,6 +20,9 @@ jobs:
       # CI build from the same npm-pinned content. The freshness gate is
       # the bundle-freshness job.
       - run: npm run build
+
+      - name: Nav completeness gate
+        run: npm run check:nav
 
       - name: Verify the page, the bundle, and the canonical logo asset
         run: |
@@ -44,11 +42,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Checkout the shell package (the chrome SSOT)
-        uses: actions/checkout@v4
-        with:
-          repository: oimlsmart/site-shell
-          path: vendor/site-shell
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -101,12 +94,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Checkout the shell package (the chrome SSOT)
-        uses: actions/checkout@v4
-        with:
-          repository: oimlsmart/site-shell
-          path: vendor/site-shell
 
       - uses: actions/setup-node@v4
         with:

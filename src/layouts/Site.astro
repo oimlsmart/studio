@@ -1,0 +1,30 @@
+---
+/**
+ * The site's base layout — the ONE injection point (TODO.public track
+ * 02): the house shell from the package (@oimlsmart/site-shell 0.2.0,
+ * machinery-only) fed the site's OWN injected config. The nav model,
+ * brand, and footer content come from src/data/ and thread through the
+ * shell's typed contract; the minisite strip renders the site's own
+ * sections under the federation header. The package invents nothing:
+ * with a config absent, its block simply does not render.
+ */
+import Base from '@oimlsmart/site-shell/chrome/astro/Base.astro'
+import MinisiteNav from '@oimlsmart/site-shell/chrome/astro/MinisiteNav.astro'
+import { BRAND } from '../data/brand'
+import { NAV_MODEL, MINISITE_SECTIONS } from '../data/nav-config'
+import { FOOTER } from '../data/footer'
+import { SITE } from '../data/site-meta'
+import '../styles/app.css'
+
+interface Props {
+  title: string
+  description?: string
+}
+
+const { title, description } = Astro.props
+---
+
+<Base title={title} description={description} brand={BRAND} nav={NAV_MODEL} footer={FOOTER}>
+  <MinisiteNav sections={MINISITE_SECTIONS} base={SITE.base} />
+  <slot />
+</Base>

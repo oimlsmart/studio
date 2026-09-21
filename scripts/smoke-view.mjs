@@ -36,6 +36,14 @@ console.log(`Loading ${VIEW}`)
 await page.goto(VIEW, { waitUntil: 'networkidle', timeout: 30000 })
 await page.waitForTimeout(3000)
 
+// 0. The site chrome renders — the site injects its own nav model,
+//    brand, and footer through the shell's typed contract (TODO.public
+//    track 02); the shell renders exactly what it is given.
+check('the federation header renders the site brand', (await page.locator('header.site-nav a.nav-brand', { hasText: 'SMART Studio' }).count()) === 1)
+check('the nav menu carries the Explore dropdown', (await page.locator('#nav-menu', { hasText: 'Explore' }).count()) === 1)
+check('the minisite strip carries the six sections', (await page.locator('nav[aria-label="Sections"] a').count()) === 6)
+check('the footer renders the hosts column', (await page.locator('footer h3', { hasText: 'The sites' }).count()) === 1)
+
 // 1. The viewer mounts.
 const editorChildren = await page.locator('#editor-root > *').count()
 check('editor-root has children (viewer mount succeeded)', editorChildren > 0, `count=${editorChildren}`)

@@ -1,16 +1,7 @@
 ---
-import { Base, MinisiteNav, DocsSidebar } from '@oimlsmart/site-shell'
+import Site from '../../layouts/Site.astro'
+import DocsSidebar from '@oimlsmart/site-shell/chrome/astro/DocsSidebar.astro'
 import { getCollection, render } from 'astro:content'
-import '../../styles/app.css'
-
-const NAV = [
-  { label: 'About', href: '/' },
-  { label: 'Story', href: '/story' },
-  { label: 'Docs', href: '/docs' },
-  { label: 'Demo', href: '/demo' },
-  { label: 'Viewer', href: '/view' },
-  { label: 'Studio', href: '/edit' },
-]
 
 export async function getStaticPaths() {
   const allDocs = await getCollection('docs')
@@ -21,8 +12,7 @@ const { doc } = Astro.props
 const { Content } = await render(doc)
 ---
 
-<Base title={doc.data.title ?? doc.id} description={doc.data.description}>
-  <MinisiteNav sections={NAV} base="/studio" />
+<Site title={doc.data.title ?? doc.id} description={doc.data.description}>
   <div class="max-w-7xl mx-auto px-6 py-10 grid gap-10 lg:grid-cols-[16rem_1fr]">
     <aside><DocsSidebar order={['guides']} labels={{ 'guides': 'Studio Guides' }} hrefBase="/studio/docs/" /></aside>
     <main class="docs-body">
@@ -31,4 +21,4 @@ const { Content } = await render(doc)
       <Content />
     </main>
   </div>
-</Base>
+</Site>
