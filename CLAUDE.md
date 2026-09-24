@@ -43,23 +43,43 @@ repo's own, living in `src/data/` and injected through
 Both editor surfaces load `/studio/models/oiml-r60.prl` — a server-side
 bundle of the R60 Recommendation package, committed and refreshed by
 `scripts/bundle-model.mjs` (wired to `prebuild`/`predev`). It composes
-the package with `uses` resolution from `$SMART_REPO/primmel-packages`
-(default `~/src/oimlsmart/smart`) using this repo's own npm-pinned
+the package with `uses` resolution from the packages root —
+`PRIMMEL_PACKAGES_ROOT` when declared (a checkout of the private
+content repo `oimlsmart/model-library` for authoring previews),
+otherwise the pinned `@oimlsmart/primmel-packages` dependency, which is
+the git tag `github:oimlsmart/model-library#v…` (distribution moved off
+npm on 2026-09-24 when the public package retired; the installed
+package keeps its old name) — using this repo's own npm-pinned
 kernel, then prepends the package's `package.primmel` (the merge's
 `dump()` carries no `package { }` block, and the editor's manifest panel
 needs the identity). Composition failure is fatal — the old
 load-without-deps fallback once silently shipped a partial model. A
-missing packages root is fatal when `SMART_REPO` is declared
+missing packages root is fatal when `PRIMMEL_PACKAGES_ROOT` is declared
 (misconfiguration, said out loud), a loud skip otherwise (the committed
 bundle serves). Browser builds of the kernel can't resolve `include`
 directives (no fs), so bundling stays server-side.
 
-Freshness: the `bundle-freshness` CI job regenerates from a smart
-checkout and diffs byte-identical against the committed bundle. The
-smart repo is private, so the job is gated on repo variable
-`SMART_REPO_AVAILABLE` + secret `SMART_REPO_PAT` (the
-oimlsmart.github.io gates.yml pattern) and skips cleanly until
-configured.
+Fetching the private pin: local dev needs a github.com credential that
+reads same-org private repos before `npm install`/`npm ci` can fetch
+the tag — either `gh auth setup-git` (the gh token becomes git's https
+credential for github.com) or the SSH fallback `git config --global
+url."git@github.com:".insteadOf "https://github.com/"`. CI carries the
+equivalent step in every job that runs `npm ci`, and the org's CI PAT
+must ride BOTH channels npm's two fetch phases consult: the lockfile's
+`git+ssh` URL rewrites to https carrying the PAT (the clone phase —
+its cwd is npm's cache tmp, outside any repo, where only system+global
+git config applies) AND the checkout's local extraheader is replaced
+with one carrying the PAT (the ls-remote phase — its cwd is npm's own,
+inside the checkout, where the checkout-seeded `GITHUB_TOKEN` header
+would override any URL credential). `GITHUB_TOKEN` is scoped to its
+own repository and cannot read cross-repo private content; it remains
+only as the no-secrets fallback.
+
+Freshness: the `bundle-freshness` CI job regenerates from the pinned
+dependency and diffs byte-identical against the committed bundle; the
+nightly `freshness-sentinel` compares the pin against the model-library
+tag feed (plus the kernel floor, a regeneration drift check, and a
+live smoke) and opens a standing issue when the pin lags.
 
 ## Architecture
 

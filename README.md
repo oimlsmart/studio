@@ -17,20 +17,24 @@ repo serves the component's site at <https://www.oimlsmart.org/studio>.
 
 `/studio/models/oiml-r60.prl` is committed and refreshed by
 `scripts/bundle-model.mjs` (also wired to `prebuild`/`predev`): it
-composes the PRL package from the SSOT checkout
-(`$SMART_REPO/primmel-packages`, default `~/src/oimlsmart/smart`) with
+composes the PRL package from the packages root —
+`PRIMMEL_PACKAGES_ROOT` when declared (a checkout of the private
+content repo `oimlsmart/model-library`), otherwise the pinned
+`@oimlsmart/primmel-packages` dependency (the git tag
+`github:oimlsmart/model-library#v…`; distribution moved off npm on
+2026-09-24) — with
 the studio's own npm-pinned `@primmel/primmel` kernel, prepends the
 package manifest (the merge's dump carries no `package { }` block, and
 the manifest panel needs it), and writes the bundle. Composition failure
-is fatal; a missing packages root with `SMART_REPO` declared is fatal,
+is fatal; a missing packages root with `PRIMMEL_PACKAGES_ROOT` declared
+is fatal,
 undeclared is a loud skip (the committed bundle serves).
 
-Freshness is enforced by the `bundle-freshness` CI job: regenerate from
-a smart checkout and diff byte-identical against the committed bundle.
-The smart repo is private, so the job is gated on repo variable
-`SMART_REPO_AVAILABLE` (needs secret `SMART_REPO_PAT`, a fine-grained
-read PAT — the oimlsmart.github.io gates.yml pattern) and skips cleanly
-until the coordinator configures it.
+Freshness is enforced by the `bundle-freshness` CI job (regenerate from
+the pinned dependency, diff byte-identical against the committed
+bundle) and by the nightly `freshness-sentinel`: the pin compared
+against the model-library tag feed, the kernel floor, a regeneration
+drift check, and a live smoke — a lag opens a standing issue.
 
 `@primmel/editor` is consumed from `github:primmel/editor#main` until the next
 npm release carries the viewer mode; flip to the published `^0.4.0` then.

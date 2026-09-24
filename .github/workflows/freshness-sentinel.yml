@@ -6,8 +6,15 @@ name: freshness-sentinel
 # month behind until a human notices. This nightly probe converts that
 # silence into a standing issue:
 #
-#   1. PIN LAG — the pinned @oimlsmart/primmel-packages must equal
-#      npm's latest. A newer content release means the viewer is
+#   1. PIN LAG — the pinned @oimlsmart/primmel-packages tag must equal
+#      the model-library repository's latest v* tag. Distribution moved
+#      off npm on 2026-09-24 (the public package retired — the content
+#      carries ISO/IEC- and OIML-copyright-derived material): the pin
+#      is now `github:oimlsmart/model-library#v<x.y.z>` and the
+#      comparison feed is the PRIVATE repo's tag list, read with the
+#      org's CI PAT (GITHUB_TOKEN is scoped to its own repository and
+#      cannot read cross-repo private content).
+#      A newer content tag means the viewer is
 #      behind; the bump is a deliberate PR, but the lag is never
 #      invisible.
 #   2. KERNEL FLOOR — the installed @primmel/primmel must satisfy the
@@ -51,19 +58,44 @@ jobs:
         with:
           node-version: '24'
 
+      - name: Authorize github.com fetches for the private model-library pin
+        env:
+          CI_PAT: ${{ secrets.OIMLSMART_CI_PAT_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          # npm fetches the pin in TWO phases with different cwds, so the
+          # CI PAT rides BOTH channels (the smart repo's 2026-09-24 probe
+          # series — every single-channel design fails one phase):
+          # ls-remote runs with cwd = npm's own, INSIDE this checkout,
+          # where the checkout-seeded GITHUB_TOKEN extraheader overrides
+          # any URL credential (and GITHUB_TOKEN cannot read cross-repo
+          # private content) — so the local extraheader is replaced with
+          # the PAT; clone runs with cwd = npm's cache tmp, OUTSIDE any
+          # repo, where only system+global config applies — so the PAT
+          # also rides the rewritten URL. GITHUB_TOKEN stays as the
+          # no-secrets fallback.
+          git config --global url."https://x-access-token:${CI_PAT}@github.com/".insteadOf "git@github.com:"
+          git config --global --add url."https://x-access-token:${CI_PAT}@github.com/".insteadOf "ssh://git@github.com/"
+          git config --local --unset-all http.https://github.com/.extraheader || true
+          git config --local --add http.https://github.com/.extraheader \
+            "AUTHORIZATION: basic $(printf 'x-access-token:%s' "$CI_PAT" | base64)"
+
       - name: Install dependencies
         run: npm ci
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: The packages pin equals npm's latest
+      - name: The packages pin equals the model-library's latest tag
+        env:
+          GH_TOKEN: ${{ secrets.OIMLSMART_CI_PAT_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           PIN=$(node -p "require('./package.json').devDependencies['@oimlsmart/primmel-packages']")
-          LATEST=$(npm view @oimlsmart/primmel-packages version) || { echo "::error::npm view failed — the registry did not answer"; exit 1; }
-          echo "pinned: $PIN · npm latest: $LATEST"
-          if [ "$PIN" != "$LATEST" ]; then
-            echo "::error::the viewer is behind the content: pinned $PIN, npm carries $LATEST — the deliberate pin-bump PR is owed"
+          TAG=${PIN##*#}
+          LATEST=$(gh api repos/oimlsmart/model-library/tags --paginate --jq '.[].name' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1 || true)
+          if [ -z "$LATEST" ]; then echo "::error::the model-library tag feed did not answer — gh api repos/oimlsmart/model-library/tags returned nothing (the same-org token should read it)"; exit 1; fi
+          echo "pinned: $TAG · model-library latest: $LATEST"
+          if [ "$TAG" != "$LATEST" ]; then
+            echo "::error::the viewer is behind the content: pinned $TAG, model-library carries $LATEST — the deliberate pin-bump PR is owed"
             exit 1
           fi
 
@@ -133,7 +165,7 @@ jobs:
             if (standing) {
               await github.rest.issues.createComment({
                 owner: context.repo.owner, repo: context.repo.repo, issue_number: standing.number,
-                body: `Recovered: the freshness-sentinel run of ${new Date().toISOString()} is green — ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId} (the pin equals npm's latest, the kernel satisfies the floor, the regeneration byte-equals the committed bundle, the live smoke passes).`,
+                body: `Recovered: the freshness-sentinel run of ${new Date().toISOString()} is green — ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId} (the pin equals the model-library's latest tag, the kernel satisfies the floor, the regeneration byte-equals the committed bundle, the live smoke passes).`,
               })
               await github.rest.issues.update({
                 owner: context.repo.owner, repo: context.repo.repo, issue_number: standing.number, state: 'closed',
