@@ -25,6 +25,10 @@ const { title, description } = Astro.props
 ---
 
 <Base title={title} description={description} brand={BRAND} nav={NAV_MODEL} footer={FOOTER}>
+  <!-- Search engines stay out (owner directive): every page marks
+       itself noindex, nofollow; robots.txt keeps the crawl OPEN so the
+       de-index of already-indexed pages propagates. -->
+  <meta slot="head" name="robots" content="noindex, nofollow" />
   <MinisiteNav sections={MINISITE_SECTIONS} base={SITE.base} />
   <slot />
 </Base>
