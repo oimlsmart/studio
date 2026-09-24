@@ -27,7 +27,7 @@
     "vue": "^3.5.0"
   },
   "devDependencies": {
-    "@oimlsmart/primmel-packages": "0.24.2",
+    "@oimlsmart/primmel-packages": "github:oimlsmart/model-library#v0.24.2",
     "@types/js-yaml": "^4.0.9",
     "playwright": "^1.62.1"
   }

@@ -14,10 +14,37 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      # The content pin is a PRIVATE git tag (oimlsmart/model-library —
+      # the public npm package retired 2026-09-24): npm's fetch of the
+      # lockfile's git+ssh URL needs a credential that reads the repo.
+      # GITHUB_TOKEN cannot — it is scoped to THIS repository — so the
+      # rewrite carries the org's CI PAT (contents:read), GITHUB_TOKEN
+      # only as the no-secrets fallback. Plain-https fetches
+      # (actions/checkout's own) are untouched.
+      - name: Authorize github.com fetches for the private model-library pin
+        env:
+          CI_PAT: ${{ secrets.OIMLSMART_CI_PAT_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          # npm fetches the pin in TWO phases with different cwds, so the
+          # CI PAT rides BOTH channels (the smart repo's 2026-09-24 probe
+          # series — every single-channel design fails one phase):
+          # ls-remote runs with cwd = npm's own, INSIDE this checkout,
+          # where the checkout-seeded GITHUB_TOKEN extraheader overrides
+          # any URL credential (and GITHUB_TOKEN cannot read cross-repo
+          # private content) — so the local extraheader is replaced with
+          # the PAT; clone runs with cwd = npm's cache tmp, OUTSIDE any
+          # repo, where only system+global config applies — so the PAT
+          # also rides the rewritten URL. GITHUB_TOKEN stays as the
+          # no-secrets fallback.
+          git config --global url."https://x-access-token:${CI_PAT}@github.com/".insteadOf "git@github.com:"
+          git config --global --add url."https://x-access-token:${CI_PAT}@github.com/".insteadOf "ssh://git@github.com/"
+          git config --local --unset-all http.https://github.com/.extraheader || true
+          git config --local --add http.https://github.com/.extraheader \
+            "AUTHORIZATION: basic $(printf 'x-access-token:%s' "$CI_PAT" | base64)"
       - run: npm ci
       # The prebuild hook regenerates the model bundle from the pinned
       # @oimlsmart/primmel-packages dependency on every run — local and
-      # CI build from the same npm-pinned content. The freshness gate is
+      # CI build from the same tag-pinned content. The freshness gate is
       # the bundle-freshness job.
       - run: npm run build
 
@@ -45,6 +72,33 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      # The content pin is a PRIVATE git tag (oimlsmart/model-library —
+      # the public npm package retired 2026-09-24): npm's fetch of the
+      # lockfile's git+ssh URL needs a credential that reads the repo.
+      # GITHUB_TOKEN cannot — it is scoped to THIS repository — so the
+      # rewrite carries the org's CI PAT (contents:read), GITHUB_TOKEN
+      # only as the no-secrets fallback. Plain-https fetches
+      # (actions/checkout's own) are untouched.
+      - name: Authorize github.com fetches for the private model-library pin
+        env:
+          CI_PAT: ${{ secrets.OIMLSMART_CI_PAT_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          # npm fetches the pin in TWO phases with different cwds, so the
+          # CI PAT rides BOTH channels (the smart repo's 2026-09-24 probe
+          # series — every single-channel design fails one phase):
+          # ls-remote runs with cwd = npm's own, INSIDE this checkout,
+          # where the checkout-seeded GITHUB_TOKEN extraheader overrides
+          # any URL credential (and GITHUB_TOKEN cannot read cross-repo
+          # private content) — so the local extraheader is replaced with
+          # the PAT; clone runs with cwd = npm's cache tmp, OUTSIDE any
+          # repo, where only system+global config applies — so the PAT
+          # also rides the rewritten URL. GITHUB_TOKEN stays as the
+          # no-secrets fallback.
+          git config --global url."https://x-access-token:${CI_PAT}@github.com/".insteadOf "git@github.com:"
+          git config --global --add url."https://x-access-token:${CI_PAT}@github.com/".insteadOf "ssh://git@github.com/"
+          git config --local --unset-all http.https://github.com/.extraheader || true
+          git config --local --add http.https://github.com/.extraheader \
+            "AUTHORIZATION: basic $(printf 'x-access-token:%s' "$CI_PAT" | base64)"
       - run: npm ci
       - run: npm run build
 
@@ -87,8 +141,11 @@ jobs:
     # The SSOT freshness gate: regenerates the model bundle from the
     # PINNED @oimlsmart/primmel-packages dependency (the version pin in
     # package.json IS the content contract) and diffs it byte-identical
-    # against the committed one. Runs unconditionally — the pinned
-    # package is public on npm, so no PAT, no checkout of a private
+    # against the committed one. Runs unconditionally — the pin is a
+    # git tag of the private oimlsmart/model-library (the public npm
+    # package retired 2026-09-24), read with the org's CI PAT (the auth
+    # step below; GITHUB_TOKEN cannot read cross-repo private content),
+    # so no dedicated PAT, no checkout of a private
     # repo, no skip switch. A content change lands by a deliberate
     # version bump (regenerate locally, commit the fresh bundle).
     runs-on: ubuntu-latest
@@ -98,6 +155,33 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      # The content pin is a PRIVATE git tag (oimlsmart/model-library —
+      # the public npm package retired 2026-09-24): npm's fetch of the
+      # lockfile's git+ssh URL needs a credential that reads the repo.
+      # GITHUB_TOKEN cannot — it is scoped to THIS repository — so the
+      # rewrite carries the org's CI PAT (contents:read), GITHUB_TOKEN
+      # only as the no-secrets fallback. Plain-https fetches
+      # (actions/checkout's own) are untouched.
+      - name: Authorize github.com fetches for the private model-library pin
+        env:
+          CI_PAT: ${{ secrets.OIMLSMART_CI_PAT_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          # npm fetches the pin in TWO phases with different cwds, so the
+          # CI PAT rides BOTH channels (the smart repo's 2026-09-24 probe
+          # series — every single-channel design fails one phase):
+          # ls-remote runs with cwd = npm's own, INSIDE this checkout,
+          # where the checkout-seeded GITHUB_TOKEN extraheader overrides
+          # any URL credential (and GITHUB_TOKEN cannot read cross-repo
+          # private content) — so the local extraheader is replaced with
+          # the PAT; clone runs with cwd = npm's cache tmp, OUTSIDE any
+          # repo, where only system+global config applies — so the PAT
+          # also rides the rewritten URL. GITHUB_TOKEN stays as the
+          # no-secrets fallback.
+          git config --global url."https://x-access-token:${CI_PAT}@github.com/".insteadOf "git@github.com:"
+          git config --global --add url."https://x-access-token:${CI_PAT}@github.com/".insteadOf "ssh://git@github.com/"
+          git config --local --unset-all http.https://github.com/.extraheader || true
+          git config --local --add http.https://github.com/.extraheader \
+            "AUTHORIZATION: basic $(printf 'x-access-token:%s' "$CI_PAT" | base64)"
       - run: npm ci
 
       - name: Regenerate the bundle and diff byte-identical against the committed one
