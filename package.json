@@ -9,7 +9,8 @@
     "prebuild": "node scripts/bundle-model.mjs",
     "build": "astro build",
     "preview": "astro preview",
-    "check:nav": "node scripts/check-nav.mjs"
+    "check:nav": "node scripts/check-nav.mjs",
+    "check-shell-pin": "node scripts/check-shell-pin.mjs"
   },
   "dependencies": {
     "@astrojs/mdx": "^7.0.2",

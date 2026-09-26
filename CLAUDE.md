@@ -24,6 +24,7 @@ npm run dev       # Astro dev server
 npm run build     # Astro static build → dist/
 npm run preview   # Serve the built site
 npm run check:nav # Nav completeness gate against the built dist/
+npm run check-shell-pin # Shell pin gate: the exact shell pin equals npm latest
 ```
 
 Astro 7, static output, `base: '/studio'`. Node 24 in CI.
@@ -37,6 +38,9 @@ piece of site content — nav model, brand, services, footer — is this
 repo's own, living in `src/data/` and injected through
 `src/layouts/Site.astro`, the one mount of the shell's `Base`. The old
 `file:vendor/site-shell` channel and its CI checkout steps are gone.
+The `check-shell-pin` gate (scripts/check-shell-pin.mjs, a CI leg
+beside check:nav) proves the pin is exact and equals npm's latest
+published release.
 
 ### The model bundle
 
