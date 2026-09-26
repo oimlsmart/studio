@@ -2,3 +2,9 @@ node_modules/
 dist/
 .astro/
 vendor/
+
+# npm pack artifacts (local probes)
+*.tgz
+# the vendored kernel staging pin IS committed (package.json rides it
+# until @primmel/primmel 1.20.0 publishes — the model-library vendor/ idiom)
+!kernel/*.tgz

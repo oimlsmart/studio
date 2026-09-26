@@ -14,8 +14,17 @@ public face (About / Story / Docs / Demo / Viewer / Studio nav).
 The editor source lives in a sibling repo (`~/src/primmel/editor/`,
 GitHub: `primmel/editor`). This repo consumes `github:primmel/editor#main`
 until the next npm release carries the viewer mode (`readOnly` mount
-option); flip to the published `^0.4.0` then. The Primmel kernel
-(`@primmel/primmel@^1.6.1`) is consumed from npm.
+option); flip to the published `^0.4.0` then. The Primmel kernel rides
+the **vendored staging pin** `file:kernel/primmel-1.19.0-pr93-afe9bd5.tgz`
+(kernel/README.md): the pinned content's peer floor is
+`@primmel/primmel >=1.20.0` — unpublished — and the published 1.19.0
+silently parse-skips the R 60-2 preparation/stimulus programs
+(forward-compat), so the pre-release build is vendored byte-identical
+from the content package's own `vendor/` (the smart repo's PR #425
+pattern). The `.npmrc` carries `legacy-peer-deps=true` for the
+interlude (the tarball reports 1.19.0 against the >=1.20.0 floor — the
+tarball IS the pre-release 1.20.0 content). Both retire at the kernel's
+1.20.0 publish: the dependency returns to a published range.
 
 ## Commands
 
@@ -51,10 +60,13 @@ the package with `uses` resolution from the packages root —
 `PRIMMEL_PACKAGES_ROOT` when declared (a checkout of the private
 content repo `oimlsmart/model-library` for authoring previews),
 otherwise the pinned `@oimlsmart/primmel-packages` dependency, which is
-the git tag `github:oimlsmart/model-library#v…` (distribution moved off
+the git ref `github:oimlsmart/model-library#<v… tag or full sha>`
+(distribution moved off
 npm on 2026-09-24 when the public package retired; the installed
-package keeps its old name) — using this repo's own npm-pinned
-kernel, then prepends the package's `package.primmel` (the merge's
+package keeps its old name; a sha pin rides content ahead of the latest
+tag until the owner's next release, the smart repo's PR #425 pattern) —
+using this repo's own kernel (the vendored staging pin,
+kernel/README.md), then prepends the package's `package.primmel` (the merge's
 `dump()` carries no `package { }` block, and the editor's manifest panel
 needs the identity). Composition failure is fatal — the old
 load-without-deps fallback once silently shipped a partial model. A
@@ -82,8 +94,11 @@ only as the no-secrets fallback.
 Freshness: the `bundle-freshness` CI job regenerates from the pinned
 dependency and diffs byte-identical against the committed bundle; the
 nightly `freshness-sentinel` compares the pin against the model-library
-tag feed (plus the kernel floor, a regeneration drift check, and a
-live smoke) and opens a standing issue when the pin lags.
+tag feed (a sha pin instead proves it contains the latest tag and sits
+on main's history), checks the kernel against the packages' peer floor
+(a `file:` staging tarball proves its identity instead of the
+unpublishable semver range), re-runs the regeneration drift check, and
+smokes the live site — opening a standing issue when a leg fails.
 
 ## Architecture
 
