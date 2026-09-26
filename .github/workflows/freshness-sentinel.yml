@@ -17,9 +17,28 @@ name: freshness-sentinel
 #      A newer content tag means the viewer is
 #      behind; the bump is a deliberate PR, but the lag is never
 #      invisible.
+#      SHA-PIN INTERLUDE: when the content ahead of the latest tag is
+#      needed before the owner's next release, the pin is a full commit
+#      sha (the smart repo's consumer-wave pattern, its PR #425). The
+#      leg then proves position instead of equality: the latest tag must
+#      be an ancestor of the pin (a newer tag appearing flips this red —
+#      the deliberate re-pin to the tag is owed) and the pin must be an
+#      ancestor of the model-library's main HEAD (the pin is not a dead
+#      branch). Untagged commits landing on main after the pin do not
+#      trip the leg — the tag feed is the release signal.
 #   2. KERNEL FLOOR — the installed @primmel/primmel must satisfy the
 #      packages' declared peer floor (>=1.18.0 since 0.24.2). The
 #      1.6.1-vs-1.18 compose failure class, caught at check time.
+#      STAGING-PIN INTERLUDE: when the floor names an UNPUBLISHED kernel
+#      (>=1.20.0 with the preparation/stimulus constructs), the
+#      dependency rides a vendored `file:` tarball of the pre-release
+#      build (kernel/README.md — the model-library vendor/ idiom, the
+#      smart repo's PR #425 pattern). The semver check cannot express
+#      that (the tarball reports the last published version), so the leg
+#      verifies the staging pin's identity instead: the spec is the
+#      expected tarball, the file is committed, and the installed
+#      version equals the tarball's. The semver check resumes when the
+#      dependency returns to a published range.
 #   3. REGENERATION — a fresh bundle must byte-equal the committed
 #      one (the same proof ci.yml's bundle-freshness job makes on
 #      every push; here it guards the artifact against time).
@@ -90,21 +109,57 @@ jobs:
           GH_TOKEN: ${{ secrets.OIMLSMART_CI_PAT_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           PIN=$(node -p "require('./package.json').devDependencies['@oimlsmart/primmel-packages']")
-          TAG=${PIN##*#}
+          REF=${PIN##*#}
           LATEST=$(gh api repos/oimlsmart/model-library/tags --paginate --jq '.[].name' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1 || true)
           if [ -z "$LATEST" ]; then echo "::error::the model-library tag feed did not answer — gh api repos/oimlsmart/model-library/tags returned nothing (the same-org token should read it)"; exit 1; fi
-          echo "pinned: $TAG · model-library latest: $LATEST"
-          if [ "$TAG" != "$LATEST" ]; then
-            echo "::error::the viewer is behind the content: pinned $TAG, model-library carries $LATEST — the deliberate pin-bump PR is owed"
+          echo "pinned: $REF · model-library latest: $LATEST"
+          if [[ "$REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            if [ "$REF" != "$LATEST" ]; then
+              echo "::error::the viewer is behind the content: pinned $REF, model-library carries $LATEST — the deliberate pin-bump PR is owed"
+              exit 1
+            fi
+          elif [[ "$REF" =~ ^[0-9a-f]{40}$ ]]; then
+            # The sha-pin interlude (the pin rides content ahead of the
+            # latest tag, the smart repo's PR #425 pattern): prove the
+            # pin CONTAINS the latest tag (a newer tag flips this red)
+            # and sits on main's history (not a dead branch).
+            TAG_STATUS=$(gh api "repos/oimlsmart/model-library/compare/${LATEST}...${REF}" --jq .status)
+            echo "compare $LATEST...$REF: $TAG_STATUS"
+            if [ "$TAG_STATUS" != "ahead" ] && [ "$TAG_STATUS" != "identical" ]; then
+              echo "::error::the pinned sha $REF does not contain the latest tag $LATEST (compare: $TAG_STATUS) — a newer release is unconsumed; the deliberate re-pin PR is owed"
+              exit 1
+            fi
+            MAIN=$(gh api repos/oimlsmart/model-library/commits/main --jq .sha)
+            MAIN_STATUS=$(gh api "repos/oimlsmart/model-library/compare/${REF}...${MAIN}" --jq .status)
+            echo "compare $REF...main($MAIN): $MAIN_STATUS"
+            if [ "$MAIN_STATUS" != "ahead" ] && [ "$MAIN_STATUS" != "identical" ]; then
+              echo "::error::the pinned sha $REF is not on the model-library's main history (compare: $MAIN_STATUS) — the pin rides a dead branch"
+              exit 1
+            fi
+          else
+            echo "::error::the pin ref '$REF' is neither a v* tag nor a full commit sha — the pin grammar this leg proves"
             exit 1
           fi
 
       - name: The installed kernel satisfies the packages' peer floor
         run: |
+          SPEC=$(node -p "require('./package.json').dependencies['@primmel/primmel']")
           FLOOR=$(node -p "(require('./node_modules/@oimlsmart/primmel-packages/package.json').peerDependencies || {})['@primmel/primmel'] || ''")
           INSTALLED=$(node -p "require('./node_modules/@primmel/primmel/package.json').version")
-          echo "floor: ${FLOOR:-none declared} · installed: $INSTALLED"
-          if [ -n "$FLOOR" ]; then
+          echo "spec: $SPEC · floor: ${FLOOR:-none declared} · installed: $INSTALLED"
+          if [[ "$SPEC" == file:* ]]; then
+            # The vendored kernel staging pin (kernel/README.md): the
+            # floor names an unpublished release, the tarball IS its
+            # pre-release content reporting the last published version —
+            # semver cannot express that, so prove the staging pin's
+            # identity instead.
+            TARBALL="${SPEC#file:}"
+            [ -f "$TARBALL" ] || { echo "::error::the staging tarball $TARBALL is not committed"; exit 1; }
+            TGZ_VERSION=$(tar -xzOf "$TARBALL" package/package.json | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).version")
+            echo "tarball version: $TGZ_VERSION"
+            [ "$TGZ_VERSION" = "$INSTALLED" ] || { echo "::error::the installed kernel $INSTALLED does not match the staging tarball's $TGZ_VERSION"; exit 1; }
+            echo "the semver floor $FLOOR is suspended by the staging pin — it resumes when the dependency returns to a published range"
+          elif [ -n "$FLOOR" ]; then
             npx --yes semver@7 -r "$FLOOR" "$INSTALLED" > /dev/null || { echo "::error::kernel $INSTALLED does not satisfy the packages' floor $FLOOR — the content cannot parse under this kernel"; exit 1; }
           fi
 
@@ -165,7 +220,7 @@ jobs:
             if (standing) {
               await github.rest.issues.createComment({
                 owner: context.repo.owner, repo: context.repo.repo, issue_number: standing.number,
-                body: `Recovered: the freshness-sentinel run of ${new Date().toISOString()} is green — ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId} (the pin equals the model-library's latest tag, the kernel satisfies the floor, the regeneration byte-equals the committed bundle, the live smoke passes).`,
+                body: `Recovered: the freshness-sentinel run of ${new Date().toISOString()} is green — ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId} (the pin leg passes — the pin equals the latest tag, or a sha pin provably contains it — the kernel satisfies the floor or rides the verified staging tarball, the regeneration byte-equals the committed bundle, the live smoke passes).`,
               })
               await github.rest.issues.update({
                 owner: context.repo.owner, repo: context.repo.repo, issue_number: standing.number, state: 'closed',

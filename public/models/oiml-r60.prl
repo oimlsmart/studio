@@ -713,7 +713,7 @@ class Application#data {
     modality SHALL
   }
   status: enum {
-    definition "Includes sample-receipt steps per TODO.UPGRADE/01 and the ia_requests_changes/applicant_resubmits loop (CHANGES_REQUESTED) per state-machines.yaml; COMPLETED is the Evaluation Project's settled terminal (the demo-flows program's completion gate: the ia_marks_completed hop declares the completion_settled guard — the transition refuses while specification/constraints.prl's settling constraints stand violated)"
+    definition "Declares the OIML-CS order (PD-05, 4.2.1–4.2.5): the applicant submits, the Issuing Authority reviews and negotiates the requested edits pre-acceptance (the ia_requests_changes/applicant_resubmits loop, CHANGES_REQUESTED — never after acceptance), the written decision follows (UNDER_REVIEW → ACCEPTED/REJECTED, PD-05, 4.2.4), and the sample-receipt steps (TODO.UPGRADE/01) are post-acceptance — the sample count is communicated on acceptance (PD-05, 4.2.5) and the ia_logs_samples hop declares the receipt_complete guard, so the samples-received landing refuses while a requested sample's receipt stands unregistered; COMPLETED is the Evaluation Project's settled terminal (the demo-flows program's completion gate: the ia_marks_completed hop declares the completion_settled guard — the transition refuses while specification/constraints.prl's settling constraints stand violated)"
     modality SHALL
     enum_values { DRAFT SUBMITTED SAMPLES_REQUESTED SAMPLES_RECEIVED UNDER_REVIEW CHANGES_REQUESTED ACCEPTED REJECTED WITHDRAWN COMPLETED }
   }
@@ -795,7 +795,7 @@ class Application#data {
     modality MAY
   }
   sample_request: reference(SampleRequest)[0..1] {
-    definition "The IA's outstanding or answered sample request (PD-05 §4.3) — recorded when the application enters SAMPLES_REQUESTED; the applicant ships against it (manufacturer_ships per sample), receipt is logged by the receiver"
+    definition "The IA's outstanding or answered sample request (PD-05, 4.2.5 — the sample count rides the acceptance; the request serves the tests of 4.3.1): recorded when the IA fires ia_requests_samples against the ACCEPTED application; the applicant ships against it (manufacturer_ships per sample) and the receiver logs the receipts — the receipt_complete guard holds the SAMPLES_RECEIVED landing until every requested sample's receipt is registered"
     modality MAY
   }
   previous_test_reports: reference(PreviousTestReportRef)[0..*] {
@@ -2337,7 +2337,7 @@ class SampleInfo#data {
   }
 }
 class SampleRequest#data {
-  description { "The IA's request for physical samples against a submitted application (PD-05 §4.3): which models, how many samples of each, the routing (to the IA for onward dispatch, or directly to each named test laboratory), and free-text particulars (deadline, conditions, shipping instructions). Recorded on Application.sample_request when the IA fires ia_requests_samples; the stub samples it spawns carry the request through the custody chain (REQUESTED → IN_TRANSIT → RECEIVED)." }
+  description { "The IA's request for physical samples against an ACCEPTED application (PD-05, 4.2.5 states the sample count on acceptance; the tests the samples serve run at the listed Test Laboratories per 4.3.1 — the routing-to-IA or to-each-laboratory decision is the platform's dispatch convention, never a PD-05 clause): which models, how many samples of each, the routing (to the IA for onward dispatch, or directly to each named test laboratory), and free-text particulars (deadline, conditions, shipping instructions). Recorded on Application.sample_request when the IA fires ia_requests_samples; the stub samples it spawns carry the request through the custody chain (REQUESTED → IN_TRANSIT → RECEIVED)." }
   helper { true }
   routing: enum {
     definition "The sample-routing decision (PD-05 §4.3 — the IA's sample request carries it): send the samples to the IA (which dispatches them to its laboratories after receipt) or directly to each named test laboratory"
@@ -2579,6 +2579,10 @@ class TestEvaluationReportRef#data {
   }
   pages: integer[0..1] {
     definition ""
+    modality MAY
+  }
+  laboratory: string[0..1] {
+    definition "The test laboratory's display name as it appears in the certificate's public particulars (the OIML-CS certificate register shows which test laboratory performed each test report, and the real certificates name where the tests were performed). The reference stays optional, so existing rows and payloads remain valid."
     modality MAY
   }
 }
@@ -4612,6 +4616,26 @@ class PhysicalDimensions#data {
     modality MAY
   }
 }
+class TwinBinding#data {
+  description { "The instance-level twin endpoint binding of a MeasuringInstrumentSample (TODO.twin-demo/01): the fact that sample S is served at endpoint E with identity I. The endpoint TYPE is package-declared (the rec's model/twin.prl — e.g. oiml-r60's endpoint loadcell_api with get_indication / watch_state / run_self_test); this record binds ONE sample to ONE serving of that type. Custody attaches to the sample, so the binding does too." }
+  helper { true }
+  endpoint_profile: string {
+    definition "Id of the package-declared twin endpoint serving this sample (the rec package's model/twin.prl endpoint declaration — e.g. loadcell_api in oiml-r60); the declaration carries the protocol profile (rest_json/graphql) and the legal operations"
+    modality SHALL
+  }
+  base_url: string {
+    definition "Where the twin serves (the demo SST: http://localhost:5290; a hosted sim: its https URL) — a deployment datum recorded when the binding is made, never model content"
+    modality SHALL
+  }
+  device_key_id: string[0..1] {
+    definition "Device key id for signed-serve verification against the platform's device registry when the twin serves signed (the SST's opt-in signed-serve posture); absent = unsigned serves, no key verification"
+    modality MAY
+  }
+  world_token_ref: string[0..1] {
+    definition "Reference label resolving to the world-mutation token when the sim boots with a world-token posture (SIM_WORLD_TOKEN) — a reference, never the token itself"
+    modality MAY
+  }
+}
 class MeasuringInstrumentModelFamily#data {
   store { measuringInstrumentModelFamilies }
   description { "Family of measuring instruments (OIML V 1:2022, 4.02; R 60-1, 3.4.2). HAS MANY Models (optionally via Groups). Its classification and parameters act as defaults inherited by its groups/models (INV-10)." }
@@ -4890,6 +4914,10 @@ class MeasuringInstrumentSample#data {
   }
   operational_state: reference(OperationalState)[0..1] {
     definition "The sample's current node in the rec's OPERATIONAL state machine (data/<rec>/model/state.yaml, TODO.roadmap/07 + task 29 — e.g. the R 144 warm-up machine off → warming_up → ready → measuring). Instance-level HAS state with an append-only trajectory; tests gate on it via the precondition `state:` facet (violation ⇒ run invalid, never fail). Absent = no operational state tracked (the gate reads the machine's initial node). Strictly separate from `status` (lifecycle family)."
+    modality MAY
+  }
+  twin_binding: reference(TwinBinding)[0..1] {
+    definition "The twin endpoint binding when this sample is reached through its twin (TODO.twin-demo/01 — the demo's SST, a Simulated SMART Measuring Instrument Twin, presented as the SMI under test): which package-declared endpoint profile serves it, at which deployment URL, and under which device key. The identity proof terms ride the record: the served instrument.identification.serialNumber must equal this sample's serial_number (the Connect stage's check, TODO.twin-demo/02), and device_key_id verifies signed serves when the sim signs them. Absent = a plain hardware sample."
     modality MAY
   }
   created: datetime {
@@ -7882,30 +7910,32 @@ form r60-3/sec-4.4.1 {
   description "General information regarding the evaluation process — manufacturer of the specimen"
   data_class FormInstance#data
   section "R 60-3, 4.4.1"
+  ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.1"
   ref report-format "urn:oiml:pub:r:60-3:2021#clause-4.4.1"
   ref report-format "urn:oiml:pub:r:60-3:2021#clause-4.4.1/table-1"
   ref report-format "urn:oiml:pub:r:60-3:2021#clause-4.4"
-  field company : string { label "Company" bind manufacturer.legal_name required true }
-  field address : string { label "Address" }
-  field contact_information : string { label "Contact information" }
+  field company : string { label "Company" description "Name of the manufacturer of the specimen — the application shall include the name and address of the manufacturer (PD-05, 4.1.2); a labeled row of the report-format table whose use is mandatory in the OIML-CS framework (R 60-3, 4.4.1 and 2)" bind manufacturer.legal_name required true targets { /req/cs/application-contents } ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.1/table-1" }
+  field address : string { label "Address" description "Address of the manufacturer — the application shall include the name and address of the manufacturer (PD-05, 4.1.2); a labeled row of the mandatory report-format table (R 60-3, 4.4.1)" required true targets { /req/cs/application-contents } ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.1/table-1" }
+  field contact_information : string { label "Contact information" description "Contact information of the manufacturer — a labeled row of the mandatory report-format table that states no condition (R 60-3, 4.4.1); PD-05, 4.1.2 names only the manufacturer's name and address, so the requiredness rests on the report format alone" required true targets { /req/cs/application-completeness } ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.1/table-1" }
 }
 form r60-3/sec-4.4.2 {
   name "Applicant"
   description "General information regarding the evaluation process — applicant"
   data_class FormInstance#data
   section "R 60-3, 4.4.2"
+  ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.2"
   ref report-format "urn:oiml:pub:r:60-3:2021#clause-4.4.2"
   ref report-format "urn:oiml:pub:r:60-3:2021#clause-4.4.2/table-1"
-  field company : string { label "Company" }
-  field representative : string { label "Representative (name, telephone)" }
-  field address : string { label "Address" }
-  field contact_information : string { label "Contact information" }
-  field reference : string { label "Reference" }
-  field date_of_application : date { label "Date of application" }
-  field application_number : string { label "Application number" bind application.application_number }
-  field authorised_by_manufacturer : boolean { label "Applicant authorised by the manufacturer (documented)" true_label "Yes" false_label "No" }
-  field no_concurrent_application : boolean { label "Statement that no concurrent application for OIML type evaluation has been made to any other OIML Issuing Authority (see Procedural Document PD-05 [29], 4.1.2 b)" true_label "Yes" false_label "No" }
-  field remarks : text { label "Remarks" }
+  field company : string { label "Company" description "Identity of the applicant the evaluation report carries — a labeled row of the report-format table whose use is mandatory in the OIML-CS framework (R 60-3, 4.4.2 and 2); the completeness review shall identify the applicant (PD-05, 4.2.1)" required true targets { /req/cs/application-completeness } ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.2/table-1" }
+  field representative : string { label "Representative (name, telephone)" description "Name and telephone of the applicant's representative — a labeled row of the mandatory report-format table (R 60-3, 4.4.2); part of the applicant identification the completeness review requires (PD-05, 4.2.1)" required true targets { /req/cs/application-completeness } ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.2/table-1" }
+  field address : string { label "Address" description "The applicant's address — a labeled row of the mandatory report-format table (R 60-3, 4.4.2); part of the applicant identification the completeness review requires (PD-05, 4.2.1)" required true targets { /req/cs/application-completeness } ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.2/table-1" }
+  field contact_information : string { label "Contact information" description "Contact information of the applicant — a labeled row of the mandatory report-format table (R 60-3, 4.4.2); part of the applicant identification the completeness review requires (PD-05, 4.2.1)" required true targets { /req/cs/application-completeness } ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.2/table-1" }
+  field reference : string { label "Reference" description "The applicant's own reference for the application — a labeled row of the mandatory report-format table (R 60-3, 4.4.2); the row states no condition, so the report carries it" required true ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.2/table-1" }
+  field date_of_application : date { label "Date of application" description "Date the application was made — a labeled row of the mandatory report-format table (R 60-3, 4.4.2); the row states no condition, so the report carries it" required true ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.2/table-1" }
+  field application_number : string { label "Application number" description "Number identifying the application the report is traced to — a labeled row of the mandatory report-format table (R 60-3, 4.4.2); the row states no condition, so the report carries it" bind application.application_number required true ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.2/table-1" }
+  field authorised_by_manufacturer : boolean { label "Applicant authorised by the manufacturer (documented)" description "Documented statement whether the applicant is authorised by the manufacturer — a Yes/No row of the mandatory report-format table that must be answered (R 60-3, 4.4.2); the application names the manufacturer and, if appropriate, the authorised representative (PD-05, 4.1.2)" required true true_label "Yes" false_label "No" targets { /req/cs/application-contents } ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.2/table-1" }
+  field no_concurrent_application : boolean { label "Statement that no concurrent application for OIML type evaluation has been made to any other OIML Issuing Authority (see Procedural Document PD-05 [29], 4.1.2 b)" description "The statement the application shall include — no concurrent application for OIML type evaluation to any other OIML Issuing Authority (PD-05, 4.1.2 b); a Yes/No row of the mandatory report-format table that must be answered (R 60-3, 4.4.2)" required true true_label "Yes" false_label "No" targets { /req/cs/application-contents } ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.2/table-1" }
+  field remarks : text { label "Remarks" description "Free-text remarks row of the report-format table (R 60-3, 4.4.2); the row states no completion obligation — the mandatory Remarks of R 60-3, 3 applies to omitted tests, not to this table — so the field stays optional" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.2/table-1" }
 }
 form r60-3/sec-4.4.3 {
   name "Testing laboratories involved in the tests"
@@ -7913,29 +7943,34 @@ form r60-3/sec-4.4.3 {
   data_class FormInstance#data
   section "R 60-3, 4.4.3"
   note "This table has to be completed for each test laboratory."
+  ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.3"
   ref report-format "urn:oiml:pub:r:60-3:2021#clause-4.4.3"
   ref report-format "urn:oiml:pub:r:60-3:2021#clause-4.4.3/table-1"
   field testing_laboratories : array {
     label "Testing laboratories"
+    description "One block per test laboratory involved in the tests — the report-format table has to be completed for each test laboratory (R 60-3, 4.4.3); each Test Laboratory's report covers the tests it conducted (PD-05, 4.4.1) and identifies the laboratory (PD-05, 4.4.3)"
+    required true
     items { object }
+    targets { /req/cs/test-report-18-elements }
+    ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.3/table-1"
     fields {
-      field name : string { label "Name" }
-      field address : string { label "Address" }
-      field application_number : string { label "Application number" bind application.application_number }
-      field tests_by_lab : string { label "Tests by this laboratory" }
-      field date_period : string { label "Date/period of tests" }
-      field test_engineers : string { label "Name(s) of test engineer(s)" }
-      field accredited_by : string { label "Accredited by" }
-      field accreditation_number : string { label "Accreditation number" }
-      field accreditation_expires : date { label "Accreditation expires (date)" }
-      field accreditation_includes_r60 : boolean { label "Accreditation includes R 60" true_label "Yes" false_label "No" }
-      field accreditation_edition : string { label "Accreditation edition" }
-      field peer_assessment_details : text { label "Details of relevant peer assessment or assessment by other means" }
-      field offsite_test_details : text { label "In case tests have been performed at locations other than the address of this laboratory, give details here" }
-      field responsible_person : string { label "Name of the responsible person" }
-      field signature_date : date { label "Date of signature" }
-      field stamp_signature : attachment { label "Stamp (if applicable) and signature of the responsible person" }
-      field remarks : text { label "Remarks" }
+      field name : string { label "Name" description "Name of the test laboratory — part of the identification of the laboratory the test report must carry (PD-05, 4.4.3); a labeled row of the per-laboratory report-format table (R 60-3, 4.4.3)" required true targets { /req/cs/test-report-18-elements } ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.3/table-1" }
+      field address : string { label "Address" description "Address of the test laboratory — part of the identification of the laboratory the test report must carry (PD-05, 4.4.3); a labeled row of the per-laboratory report-format table (R 60-3, 4.4.3)" required true targets { /req/cs/test-report-18-elements } ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.3/table-1" }
+      field application_number : string { label "Application number" description "Number identifying the application the laboratory's tests serve — a labeled row of the per-laboratory report-format table (R 60-3, 4.4.3); part of the report's identification chain (PD-05, 4.4.3)" bind application.application_number required true targets { /req/cs/test-report-18-elements } ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.3/table-1" }
+      field tests_by_lab : string { label "Tests by this laboratory" description "The tests this laboratory performed — each Test Laboratory's report includes the results of the tests it has conducted (PD-05, 4.4.1); a labeled row of the per-laboratory report-format table (R 60-3, 4.4.3)" required true targets { /req/cs/multiple-test-laboratories } ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.3/table-1" }
+      field date_period : string { label "Date/period of tests" description "Date or period of the tests this laboratory performed — a labeled row of the per-laboratory report-format table (R 60-3, 4.4.3); the report records the test conditions applied (PD-05, 4.4.3)" required true targets { /req/cs/test-report-18-elements } ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.3/table-1" }
+      field test_engineers : string { label "Name(s) of test engineer(s)" description "Name(s) of the test engineer(s) who performed the tests — a labeled row of the per-laboratory report-format table (R 60-3, 4.4.3); the row states no condition, so the report carries it" required true targets { /req/cs/test-report-18-elements } ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.3/table-1" }
+      field accredited_by : string { label "Accredited by" description "Accreditation body of the laboratory — completed when the laboratory's OIML-CS competence demonstration is accreditation; competence may be demonstrated by accreditation and/or peer assessment (PD-04, 5.2), so the report-format row (R 60-3, 4.4.3) is conditional and the field stays optional" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.3/table-1" }
+      field accreditation_number : string { label "Accreditation number" description "Number of the laboratory's accreditation — completed when the laboratory's competence demonstration is accreditation (PD-04, 5.2); conditional like accredited_by, so the field stays optional (R 60-3, 4.4.3)" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.3/table-1" }
+      field accreditation_expires : date { label "Accreditation expires (date)" description "Expiry date of the laboratory's accreditation — completed when the laboratory's competence demonstration is accreditation (PD-04, 5.2); conditional like accredited_by, so the field stays optional (R 60-3, 4.4.3)" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.3/table-1" }
+      field accreditation_includes_r60 : boolean { label "Accreditation includes R 60" description "Whether the laboratory's accreditation scope includes R 60 — answered when the laboratory's competence demonstration is accreditation (PD-04, 5.2); conditional like accredited_by, so the field stays optional (R 60-3, 4.4.3)" true_label "Yes" false_label "No" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.3/table-1" }
+      field accreditation_edition : string { label "Accreditation edition" description "The R 60 edition the accreditation covers — the report-format row places the edition in the Yes branch of Accreditation includes R 60, so it is completed exactly when that answer is Yes (R 60-3, 4.4.3)" required_when "ocl{accreditation_includes_r60 = true}" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.3/table-1" }
+      field peer_assessment_details : text { label "Details of relevant peer assessment or assessment by other means" description "Details of the peer assessment or assessment by other means — completed when the laboratory's OIML-CS competence demonstration is peer assessment rather than accreditation (PD-04, 5.2); the report-format table's alternative evidence row (R 60-3, 4.4.3), so the field stays optional" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.3/table-1" }
+      field offsite_test_details : text { label "In case tests have been performed at locations other than the address of this laboratory, give details here" description "Details of tests performed away from the laboratory's address — the report-format row is conditional by its own text (In case tests have been performed at locations other than the address of this laboratory); no discriminator field carries the condition, so it stays prose and the field stays optional (R 60-3, 4.4.3)" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.3/table-1" }
+      field responsible_person : string { label "Name of the responsible person" description "Name of the laboratory's responsible person who authorises the report — the OIML test report shall be signed by the responsible person of the Test Laboratory (PD-05, 4.4.4); a labeled row of the per-laboratory report-format table (R 60-3, 4.4.3)" required true targets { /req/cs/test-report-authorization } ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.3/table-1" }
+      field signature_date : date { label "Date of signature" description "Date of the responsible person's signature — the OIML test report shall be dated (PD-05, 4.4.4); a labeled row of the per-laboratory report-format table (R 60-3, 4.4.3)" required true targets { /req/cs/test-report-authorization } ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.3/table-1" }
+      field stamp_signature : attachment { label "Stamp (if applicable) and signature of the responsible person" description "Signature of the responsible person, with the laboratory's stamp where applicable — the signature is mandatory (the OIML test report shall be signed, PD-05, 4.4.4); the stamp is conditional (if applicable, R 60-3, 4.4.3)" required true targets { /req/cs/test-report-authorization } ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.3/table-1" }
+      field remarks : text { label "Remarks" description "Free-text remarks row of the per-laboratory report-format table (R 60-3, 4.4.3); the row states no completion obligation, so the field stays optional" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.4.3/table-1" }
     }
   }
 }
@@ -7944,27 +7979,28 @@ form r60-3/sec-4.5 {
   description "General information concerning the load cell type as provided by the manufacturer prior to the evaluation"
   data_class FormInstance#data
   section "R 60-3, 4.5"
+  ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.5"
   ref report-format "urn:oiml:pub:r:60-3:2021#clause-4.5"
   ref report-format "urn:oiml:pub:r:60-3:2021#clause-4.5/table-1"
   ref report-format "urn:oiml:pub:r:60-3:2021#clause-4.5/table-2"
-  field manufacturer_name : string { label "Manufacturer's name/trade mark" bind manufacturer.legal_name required true }
-  field type_designation : string { label "Manufacturer's type designation (or load cell model number)" bind model.model_designation required true }
-  field accuracy_classes : string { label "Accuracy classes" bind model.classification.accuracy_class }
-  field accuracy_classes_range : string { label "Range of accuracy classes" }
-  field nlc : integer { label "Maximum number of verification intervals, stem:[n_LC]" bind group.parameters.n_lc }
-  field nlc_range : string { label "Range of verification intervals" }
-  field emax : number { label "Maximum capacity, stem:[E_max]" unit "unitsml(g),unitsml(kg),unitsml(t)" bind model.parameters.e_max }
-  field emax_range : string { label "Range of maximum capacities" }
-  field emin : number { label "Minimum capacity, stem:[E_min]" unit "unitsml(g),unitsml(kg),unitsml(t)" bind family.parameters.e_min }
-  field emin_range : string { label "Range of minimum capacities" }
-  field vmin : number { label "Minimum load cell verification interval, stem:[v_min = (E_max - E_min) / Y]" unit "unitsml(g),unitsml(kg),unitsml(t)" bind group.parameters.v_min }
-  field vmin_range : string { label "Range of v_min values" }
-  field dr : number { label "Minimum dead load output return, stem:[DR = 1/2 (E_max - E_min) / Z]" unit "unitsml(g),unitsml(kg),unitsml(t)" bind group.parameters.dr }
-  field dr_range : string { label "Range of DR values" }
-  field rated_output : string { label "Rated output" unit "unitsml(mV/V),counts" bind family.parameters.rated_output }
-  field rated_output_range : string { label "Range of rated outputs" }
-  field input_impedance : number { label "Input impedance" unit "unitsml(Ohm)" bind family.parameters.input_impedance required_when "ocl{family.classification.construction = 'strain-gauge'}" }
-  field input_impedance_range : string { label "Range of input impedances" }
+  field manufacturer_name : string { label "Manufacturer's name/trade mark" description "Mandatory information the manufacturer provides in the accompanying document (R 60-1, 6.2.1 and 6.2.2)" bind manufacturer.legal_name required true targets { /req/technical/mandatory-additional-info } ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.5/table-1" }
+  field type_designation : string { label "Manufacturer's type designation (or load cell model number)" description "Mandatory information the manufacturer provides in the accompanying document (R 60-1, 6.2.1 and 6.2.2)" bind model.model_designation required true targets { /req/technical/mandatory-additional-info } ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.5/table-1" }
+  field accuracy_classes : string { label "Accuracy classes" description "The load cell shall be classified into one of the four accuracy classes (R 60-1, 5.1.1 and 5.1.5); the class is mandatory additional information (R 60-1, 6.2.2)" bind model.classification.accuracy_class required true targets { /req/technical/mandatory-additional-info } ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.5/table-2" }
+  field accuracy_classes_range : string { label "Range of accuracy classes" description "The Range column of the report-format table; completed when the declaration covers a model range rather than a single value (R 60-3, 4.5 Table 2)" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.5/table-2" }
+  field nlc : integer { label "Maximum number of verification intervals, stem:[n_LC]" description "The load cell shall be classified by the maximum number of load cell verification intervals, within the class limits of R 60-1, 5.1.2 Table 1 (R 60-1, 5.1.5 and 6.2.4.5)" bind group.parameters.n_lc required true targets { /req/technical/mandatory-additional-info /req/classification/max-verification-intervals } ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.5/table-2" }
+  field nlc_range : string { label "Range of verification intervals" description "The Range column of the report-format table; completed when the declaration covers a model range rather than a single value (R 60-3, 4.5 Table 2)" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.5/table-2" }
+  field emax : number { label "Maximum capacity, stem:[E_max]" description "Mandatory marking and mandatory additional information (R 60-1, 6.2.1 and 6.2.2)" unit "unitsml(g),unitsml(kg),unitsml(t)" bind model.parameters.e_max required true targets { /req/technical/mandatory-additional-info } ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.5/table-2" }
+  field emax_range : string { label "Range of maximum capacities" description "The Range column of the report-format table; completed when the declaration covers a model range rather than a single value (R 60-3, 4.5 Table 2)" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.5/table-2" }
+  field emin : number { label "Minimum capacity, stem:[E_min]" description "Mandatory additional information the manufacturer provides in the accompanying document (R 60-1, 6.2.2)" unit "unitsml(g),unitsml(kg),unitsml(t)" bind family.parameters.e_min required true targets { /req/technical/mandatory-additional-info } ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.5/table-2" }
+  field emin_range : string { label "Range of minimum capacities" description "The Range column of the report-format table; completed when the declaration covers a model range rather than a single value (R 60-3, 4.5 Table 2)" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.5/table-2" }
+  field vmin : number { label "Minimum load cell verification interval, stem:[v_min = (E_max - E_min) / Y]" description "Mandatory additional information the manufacturer provides in the accompanying document (R 60-1, 6.2.2)" unit "unitsml(g),unitsml(kg),unitsml(t)" bind group.parameters.v_min required true targets { /req/technical/mandatory-additional-info } ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.5/table-2" }
+  field vmin_range : string { label "Range of v_min values" description "The Range column of the report-format table; completed when the declaration covers a model range rather than a single value (R 60-3, 4.5 Table 2)" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.5/table-2" }
+  field dr : number { label "Minimum dead load output return, stem:[DR = 1/2 (E_max - E_min) / Z]" description "Non-mandatory additional information the manufacturer may optionally specify (R 60-1, 6.2.3)" unit "unitsml(g),unitsml(kg),unitsml(t)" bind group.parameters.dr targets { /req/technical/non-mandatory-info } ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.5/table-2" }
+  field dr_range : string { label "Range of DR values" description "The Range column of the report-format table; completed when the declaration covers a model range rather than a single value (R 60-3, 4.5 Table 2)" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.5/table-2" }
+  field rated_output : string { label "Rated output" description "An electrical characteristic among the other pertinent conditions whose provision follows the load cell's design (R 60-1, 6.2.2)" unit "unitsml(mV/V),counts" bind family.parameters.rated_output targets { /req/technical/mandatory-additional-info } ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.5/table-2" }
+  field rated_output_range : string { label "Range of rated outputs" description "The Range column of the report-format table; completed when the declaration covers a model range rather than a single value (R 60-3, 4.5 Table 2)" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.5/table-2" }
+  field input_impedance : number { label "Input impedance" description "An electrical characteristic among the other pertinent conditions (R 60-1, 6.2.2); mandatory for strain gauge load cells (R 60-3, 4.9.1)" unit "unitsml(Ohm)" bind family.parameters.input_impedance required_when "ocl{family.classification.construction = 'strain-gauge'}" targets { /req/technical/mandatory-additional-info } ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.5/table-2" }
+  field input_impedance_range : string { label "Range of input impedances" description "The Range column of the report-format table; completed when the declaration covers a model range rather than a single value (R 60-3, 4.5 Table 2)" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.5/table-2" }
 }
 form r60-3/sec-4.6 {
   name "Accessories supplied with the test pattern by the applicant"
@@ -8092,16 +8128,21 @@ form r60-3/sec-4.9.5 {
   description "Documentation supplied with the test pattern by the applicant"
   data_class FormInstance#data
   section "R 60-3, 4.9.5"
+  ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.9.5"
   ref report-format "urn:oiml:pub:r:60-3:2021#clause-4.9.5"
   ref report-format "urn:oiml:pub:r:60-3:2021#clause-4.9.5/table-1"
   field documents : array {
     label "Documents"
+    description "The list of documents supplied with the test pattern — the application shall include a list of the manufacturer's documentation necessary and sufficient for the identification of the type (PD-05, 4.1.2); the report-format table records that list (R 60-3, 4.9.5)"
+    required true
     items { object }
+    targets { /req/cs/application-contents }
+    ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.9.5/table-1"
     fields {
-      field name : string { label "Name of the document" required true }
-      field content : text { label "Content" }
-      field version : string { label "Version No." }
-      field issue_date : date { label "Date of issue" }
+      field name : string { label "Name of the document" description "Name identifying each supplied document — the first column of the report-format table (R 60-3, 4.9.5); the document's identification in the list the application shall include (PD-05, 4.1.2)" required true targets { /req/cs/application-contents } ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.9.5/table-1" }
+      field content : text { label "Content" description "What the document contains — the Content column of the report-format table, completed for each listed document (R 60-3, 4.9.5); the column states no condition, so the field is required" required true ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.9.5/table-1" }
+      field version : string { label "Version No." description "Version number of the document — with the date of issue it carries the report-format table's combined Version No. / date of issue column (R 60-3, 4.9.5); the source cell obligates the combined entry, not each facet, so the field stays optional and is completed as the document carries it" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.9.5/table-1" }
+      field issue_date : date { label "Date of issue" description "Date of issue of the document — with the version number it carries the report-format table's combined Version No. / date of issue column (R 60-3, 4.9.5); the source cell obligates the combined entry, not each facet, so the field stays optional and is completed as the document carries it" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-4.9.5/table-1" }
     }
   }
 }
@@ -8611,6 +8652,7 @@ form r60-3/sec-5.4 {
   data_class FormInstance#data
   section "R 60-3, 5.4"
   requirements { /req/technical/mandatory-additional-info }
+  ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.5"
   ref test-procedure "urn:oiml:pub:r:60-2:2021#clause-2.5"
   ref report-format "urn:oiml:pub:r:60-3:2021#clause-5.4"
   ref report-format "urn:oiml:pub:r:60-3:2021#clause-5.4/table-1"
@@ -8621,16 +8663,17 @@ form r60-3/sec-5.4 {
     default "[{\"item\":\"Description of the general principle of measurement\",\"reference\":\"urn:oiml:pub:r:60-2:2021#clause-2.5\"},{\"item\":\"List and characteristics of essential components + details\",\"reference\":\"\"},{\"item\":\"Mechanical drawings\",\"reference\":\"urn:oiml:pub:r:60-2:2021#clause-2.5\"},{\"item\":\"Electric/electronic diagrams\",\"reference\":\"urn:oiml:pub:r:60-2:2021#clause-2.5\"},{\"item\":\"Installation requirements\",\"reference\":\"urn:oiml:pub:r:60-2:2021#clause-2.5\"},{\"item\":\"Sealing plan\",\"reference\":\"\"},{\"item\":\"Panel layout\",\"reference\":\"\"},{\"item\":\"General information of the software\",\"reference\":\"urn:oiml:pub:r:60-2:2021#clause-2.5\"},{\"item\":\"Operating instructions\",\"reference\":\"urn:oiml:pub:r:60-2:2021#clause-2.5\"},{\"item\":\"Information supporting manufacturer's assumption of compliance\",\"reference\":\"urn:oiml:pub:r:60-2:2021#clause-2.5\"}]"
     items { object }
     targets { /req/technical/mandatory-additional-info }
+    ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.5"
     fields {
-      field item : string { label "Document item" description "Description of the required document" }
-      field r60_reference : string { label "R 60 reference" description "Clause reference in R 60-2" }
-      field present : boolean { label "Present" description "Whether the document has been submitted" true_label "Yes" false_label "No" }
-      field remarks : string { label "Remarks" }
+      field item : string { label "Document item" description "Description of the required document" ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.5" }
+      field r60_reference : string { label "R 60 reference" description "Clause reference in R 60-2" ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.5" }
+      field present : boolean { label "Present" description "Whether the document has been submitted" true_label "Yes" false_label "No" ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.5" }
+      field remarks : string { label "Remarks" ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.5" }
     }
   }
-  field further_information : text { label "Further information" description "Additional information relevant to the documentation review" }
-  field remarks : text { label "Remarks" description "Additional observations or notes from the documentation review" }
-  field overall_result : boolean { label "Overall result" description "PASS if all required documents are present and complete; FAIL otherwise" required true true_label "Pass" false_label "Fail" }
+  field further_information : text { label "Further information" description "Additional information relevant to the documentation review" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-5.4" }
+  field remarks : text { label "Remarks" description "Additional observations or notes from the documentation review" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-5.4" }
+  field overall_result : boolean { label "Overall result" description "PASS if all required documents are present and complete; FAIL otherwise" required true true_label "Pass" false_label "Fail" ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.5" }
   pass_fail { criteria "" pass_if "ocl{overall_result}" }
 }
 form r60-3/sec-5.1 {
@@ -8639,6 +8682,7 @@ form r60-3/sec-5.1 {
   data_class FormInstance#data
   section "R 60-3, 5.1"
   requirements { /req/technical/mandatory-markings /req/technical/class-designation /req/technical/load-type-designation /req/technical/temperature-designation /req/technical/humidity-designation /req/technical/nlc-designation }
+  ref derives-from "urn:oiml:pub:r:60-1:2021#clause-6.2"
   ref requirement "urn:oiml:pub:r:60-1:2021#clause-6.2"
   ref test-procedure "urn:oiml:pub:r:60-2:2021#clause-2.6"
   ref report-format "urn:oiml:pub:r:60-3:2021#clause-5.1"
@@ -8656,10 +8700,11 @@ form r60-3/sec-5.1 {
     default "[{\"information\":\"Name or trademark of manufacturer\",\"reference\":\"urn:oiml:pub:r:60-1:2021#clause-6.2.1\"},{\"information\":\"Manufacturer's own designation or load cell model\",\"reference\":\"urn:oiml:pub:r:60-1:2021#clause-6.2.1\"},{\"information\":\"Serial number\",\"reference\":\"urn:oiml:pub:r:60-1:2021#clause-6.2.1\"},{\"information\":\"Maximum capacity, E_max\",\"reference\":\"urn:oiml:pub:r:60-1:2021#clause-6.2.1\"},{\"information\":\"Year of production\",\"reference\":\"urn:oiml:pub:r:60-1:2021#clause-6.2.1\"},{\"information\":\"Type approval mark (if applicable)\",\"reference\":\"urn:oiml:pub:r:60-1:2021#clause-6.2.1\"}]"
     items { object }
     targets { /req/technical/mandatory-markings }
+    ref derives-from "urn:oiml:pub:r:60-1:2021#clause-6.2.1"
     fields {
-      field r60_reference : string { label "R 60 reference" description "Clause reference in R 60-1" }
-      field information : string { label "Information" description "Description of the required marking" }
-      field fulfils_requirements : boolean { label "Fulfils requirements" description "Whether this marking is present and correct" true_label "Yes" false_label "No" }
+      field r60_reference : string { label "R 60 reference" description "Clause reference in R 60-1" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-6.2.1" }
+      field information : string { label "Information" description "Description of the required marking" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-6.2.1" }
+      field fulfils_requirements : boolean { label "Fulfils requirements" description "Whether this marking is present and correct" true_label "Yes" false_label "No" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-6.2.1" }
     }
   }
   field mandatory_markings_on_load_cell_or_document : array {
@@ -8668,12 +8713,13 @@ form r60-3/sec-5.1 {
     default "[{\"information\":\"Accuracy classes and their symbols\",\"reference\":\"urn:oiml:pub:r:60-1:2021#clause-6.2.4.1\"},{\"information\":\"Maximum number of load cell verification intervals, n_LC\",\"reference\":\"urn:oiml:pub:r:60-1:2021#clause-6.2.4.5\"},{\"information\":\"Loading designation (if necessary)\",\"reference\":\"urn:oiml:pub:r:60-1:2021#clause-6.2.4.2\"},{\"information\":\"Working temperature designation\",\"reference\":\"urn:oiml:pub:r:60-1:2021#clause-6.2.4.3\"},{\"information\":\"Humidity symbol NH\",\"reference\":\"urn:oiml:pub:r:60-1:2021#clause-6.2.4.4\"},{\"information\":\"Humidity symbol SH\",\"reference\":\"urn:oiml:pub:r:60-1:2021#clause-6.2.4.4\"},{\"information\":\"Minimum dead load, E_min\",\"reference\":\"urn:oiml:pub:r:60-1:2021#clause-6.2.2\"},{\"information\":\"Safe load limit, E_lim\",\"reference\":\"urn:oiml:pub:r:60-1:2021#clause-6.2.2\"},{\"information\":\"Minimum load cell verification interval (v_min)\",\"reference\":\"urn:oiml:pub:r:60-1:2021#clause-5.1.3, urn:oiml:pub:r:60-1:2021#clause-6.2.2\"},{\"information\":\"Other pertinent conditions\",\"reference\":\"urn:oiml:pub:r:60-1:2021#clause-6.2.2\"},{\"information\":\"Apportionment factor, p_LC (if not equal to 0.7)\",\"reference\":\"urn:oiml:pub:r:60-1:2021#clause-3.7.2, urn:oiml:pub:r:60-1:2021#clause-5.3.2\"},{\"information\":\"Standard classification\",\"reference\":\"urn:oiml:pub:r:60-1:2021#clause-5.1.6\"},{\"information\":\"Multiple classifications\",\"reference\":\"urn:oiml:pub:r:60-1:2021#clause-5.1.7\"}]"
     items { object }
     targets { /req/technical/class-designation /req/technical/load-type-designation /req/technical/temperature-designation /req/technical/humidity-designation /req/technical/nlc-designation }
+    ref derives-from "urn:oiml:pub:r:60-1:2021#clause-6.2.2"
     fields {
-      field r60_reference : string { label "R 60 reference" }
-      field information : string { label "Information" description "Description of the required marking" }
-      field on_load_cell : boolean { label "On load cell" description "Whether this marking appears on the load cell" true_label "Yes" false_label "No" }
-      field in_document : boolean { label "In document" description "Whether this marking appears in the documentation" true_label "Yes" false_label "No" }
-      field fulfils_requirements : boolean { label "Fulfils requirements" description "Whether this marking is present and correct" true_label "Yes" false_label "No" }
+      field r60_reference : string { label "R 60 reference" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-6.2.2" }
+      field information : string { label "Information" description "Description of the required marking" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-6.2.2" }
+      field on_load_cell : boolean { label "On load cell" description "Whether this marking appears on the load cell" true_label "Yes" false_label "No" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-6.2.2" }
+      field in_document : boolean { label "In document" description "Whether this marking appears in the documentation" true_label "Yes" false_label "No" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-6.2.2" }
+      field fulfils_requirements : boolean { label "Fulfils requirements" description "Whether this marking is present and correct" true_label "Yes" false_label "No" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-6.2.2" }
     }
   }
   field additional_markings : array {
@@ -8682,12 +8728,13 @@ form r60-3/sec-5.1 {
     default "[{\"information\":\"Humidity symbol \\\"CH\\\"\",\"reference\":\"urn:oiml:pub:r:60-1:2021#clause-5.6.3.1\"},{\"information\":\"Relative v_min (Y)\",\"reference\":\"urn:oiml:pub:r:60-1:2021#clause-3.5.15\"},{\"information\":\"Relative DR (Z)\",\"reference\":\"urn:oiml:pub:r:60-1:2021#clause-3.5.14\"}]"
     items { object }
     targets { /req/technical/humidity-designation }
+    ref derives-from "urn:oiml:pub:r:60-1:2021#clause-6.2.3"
     fields {
-      field r60_reference : string { label "R 60 reference" }
-      field information : string { label "Information" }
-      field on_load_cell : boolean { label "On load cell" true_label "Yes" false_label "No" }
-      field in_document : boolean { label "In document" true_label "Yes" false_label "No" }
-      field fulfils_requirements : boolean { label "Fulfils requirements" true_label "Yes" false_label "No" }
+      field r60_reference : string { label "R 60 reference" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-6.2.3" }
+      field information : string { label "Information" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-6.2.3" }
+      field on_load_cell : boolean { label "On load cell" true_label "Yes" false_label "No" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-6.2.3" }
+      field in_document : boolean { label "In document" true_label "Yes" false_label "No" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-6.2.3" }
+      field fulfils_requirements : boolean { label "Fulfils requirements" true_label "Yes" false_label "No" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-6.2.3" }
     }
   }
   pass_fail { criteria "All mandatory markings present and correct" pass_if "ocl{mandatory_markings_on_load_cell->forAll(m | m.fulfils_requirements) and mandatory_markings_on_load_cell_or_document->forAll(m | m.fulfils_requirements) and additional_markings->forAll(m | m.fulfils_requirements)}" }
@@ -8698,29 +8745,31 @@ form r60-3/sec-5.3 {
   data_class FormInstance#data
   section "R 60-3, 5.3"
   requirements { /req/technical/software }
+  ref derives-from "urn:oiml:pub:r:60-1:2021#clause-6.1"
   ref requirement "urn:oiml:pub:r:60-1:2021#clause-6.1"
   ref report-format "urn:oiml:pub:r:60-3:2021#clause-5.3"
   ref report-format "urn:oiml:pub:r:60-3:2021#clause-5.3/table-1"
   conformance_process /conf/examinations/software
-  field date : date { label "Date of examination" description "Date when the software examination was performed" required true }
-  field observer : string { label "Observer" description "Name of the person performing the examination" }
-  field serial_number : string { label "Serial number" description "Serial number of the load cell under test" bind sample.serial_number required true }
-  field software_version : string { label "Software version" description "Version identifier of the embedded software" bind model.parameters.software_identification targets { /req/technical/software } }
-  field identification_code : string { label "Identification code" description "Software identification code displayed at power-on or on demand" targets { /req/technical/software } }
-  field software_sealed : boolean { label "Software sealed" description "Whether the software is protected by a seal or equivalent means" true_label "Yes" false_label "No" targets { /req/technical/software } }
-  field auto_change_identification_code : boolean { label "Auto-change identification code" description "Whether the identification code changes automatically if the software is modified" true_label "Yes" false_label "No" targets { /req/technical/software } }
-  field fixed_version_number : boolean { label "Fixed version number" description "Whether the software version number is fixed and cannot be altered" true_label "Yes" false_label "No" targets { /req/technical/software } }
-  field remarks : text { label "Remarks" description "Additional observations or notes from the examination" }
+  field date : date { label "Date of examination" description "Date when the software examination was performed" required true ref derives-from "urn:oiml:pub:r:60-3:2021#clause-5.3" }
+  field observer : string { label "Observer" description "Name of the person performing the examination" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-5.3" }
+  field serial_number : string { label "Serial number" description "Serial number of the load cell under test" bind sample.serial_number required true ref derives-from "urn:oiml:pub:r:60-3:2021#clause-5.3" }
+  field software_version : string { label "Software version" description "Version identifier of the embedded software" bind model.parameters.software_identification targets { /req/technical/software } ref derives-from "urn:oiml:pub:r:60-1:2021#clause-6.1" }
+  field identification_code : string { label "Identification code" description "Software identification code displayed at power-on or on demand" targets { /req/technical/software } ref derives-from "urn:oiml:pub:r:60-1:2021#clause-6.1" }
+  field software_sealed : boolean { label "Software sealed" description "Whether the software is protected by a seal or equivalent means" true_label "Yes" false_label "No" targets { /req/technical/software } ref derives-from "urn:oiml:pub:r:60-1:2021#clause-6.1" }
+  field auto_change_identification_code : boolean { label "Auto-change identification code" description "Whether the identification code changes automatically if the software is modified" true_label "Yes" false_label "No" targets { /req/technical/software } ref derives-from "urn:oiml:pub:r:60-1:2021#clause-6.1" }
+  field fixed_version_number : boolean { label "Fixed version number" description "Whether the software version number is fixed and cannot be altered" true_label "Yes" false_label "No" targets { /req/technical/software } ref derives-from "urn:oiml:pub:r:60-1:2021#clause-6.1" }
+  field remarks : text { label "Remarks" description "Additional observations or notes from the examination" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-5.3" }
   field d31_conformity : array {
     label "OIML D 31 conformity items (R 60-1, 6.1)"
     description "The four D 31 application specifics required for legally relevant software of digital load cells"
     items { object }
+    ref derives-from "urn:oiml:pub:r:60-1:2021#clause-6.1"
     fields {
-      field item : enum { enum_values { severity-level { label "Severity level I with validation procedure A declared and examined" } imprint-exception { label "Software identification imprint exception (D 31, 5.1.1) applied, if used" } type-conformity { label "Conformity of manufactured devices to the approved type (D 31, 5.2.5(a))" } verified-update { label "Field update via verified or traced update (D 31, 5.2.6.2/5.2.6.3)" } documentation { label "Software documentation per D 31, 6.1.1" } } }
-      field conforms : boolean { true_label "Yes" false_label "No" }
+      field item : enum { enum_values { severity-level { label "Severity level I with validation procedure A declared and examined" } imprint-exception { label "Software identification imprint exception (D 31, 5.1.1) applied, if used" } type-conformity { label "Conformity of manufactured devices to the approved type (D 31, 5.2.5(a))" } verified-update { label "Field update via verified or traced update (D 31, 5.2.6.2/5.2.6.3)" } documentation { label "Software documentation per D 31, 6.1.1" } } ref derives-from "urn:oiml:pub:r:60-1:2021#clause-6.1" }
+      field conforms : boolean { true_label "Yes" false_label "No" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-6.1" }
     }
   }
-  field overall_result : boolean { label "Overall result" description "PASS if all software requirements are met; FAIL otherwise" required true measurement_method evaluated evaluation { rule "ocl{software_sealed and auto_change_identification_code and fixed_version_number and d31_conformity->forAll(i | i.conforms)}" condition "Software sealed + identification code handling + fixed version + all D 31 items conform" specification_reference "R 60-1, 6.1" } true_label "Pass" false_label "Fail" }
+  field overall_result : boolean { label "Overall result" description "PASS if all software requirements are met; FAIL otherwise" required true measurement_method evaluated evaluation { rule "ocl{software_sealed and auto_change_identification_code and fixed_version_number and d31_conformity->forAll(i | i.conforms)}" condition "Software sealed + identification code handling + fixed version + all D 31 items conform" specification_reference "R 60-1, 6.1" } true_label "Pass" false_label "Fail" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-6.1" }
   pass_fail { criteria "" pass_if "ocl{software_sealed and auto_change_identification_code and fixed_version_number and d31_conformity->forAll(i | i.conforms)}" }
 }
 form r60-3/sec-5.2 {
@@ -8729,26 +8778,29 @@ form r60-3/sec-5.2 {
   data_class FormInstance#data
   section "R 60-3, 5.2"
   requirements { /req/technical/mandatory-additional-info }
+  ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.3"
+  ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.4"
   ref test-procedure "urn:oiml:pub:r:60-2:2021#clause-2.3"
   ref test-procedure "urn:oiml:pub:r:60-2:2021#clause-2.4"
   ref report-format "urn:oiml:pub:r:60-3:2021#clause-5.2"
   ref report-format "urn:oiml:pub:r:60-3:2021#clause-5.2/table-1"
   conformance_process /conf/examinations/suitability
-  field date : date { label "Date of examination" description "Date when the suitability examination was performed" required true }
-  field observer : string { label "Observer" description "Name of the person performing the examination" }
-  field serial_number : string { label "Serial number" description "Serial number of the load cell under test" bind sample.serial_number required true }
+  field date : date { label "Date of examination" description "Date when the suitability examination was performed" required true ref derives-from "urn:oiml:pub:r:60-3:2021#clause-5.2" }
+  field observer : string { label "Observer" description "Name of the person performing the examination" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-5.2" }
+  field serial_number : string { label "Serial number" description "Serial number of the load cell under test" bind sample.serial_number required true ref derives-from "urn:oiml:pub:r:60-3:2021#clause-5.2" }
   field suitability_items : array {
     label "Suitability checklist"
     description "Checklist of items verifying the load cell is suitable for type testing"
     items { object }
     targets { /req/technical/mandatory-additional-info }
+    ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.3"
     fields {
-      field item : string { label "Item" description "Description of the suitability check item" }
-      field fulfils_requirements : boolean { label "Fulfils requirements" true_label "Yes" false_label "No" }
+      field item : string { label "Item" description "Description of the suitability check item" ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.3" }
+      field fulfils_requirements : boolean { label "Fulfils requirements" true_label "Yes" false_label "No" ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.3" }
     }
   }
-  field remarks : text { label "Remarks" description "Additional observations or notes from the examination" }
-  field overall_result : boolean { label "Overall result" description "PASS if all suitability items are met; FAIL otherwise" required true true_label "Pass" false_label "Fail" }
+  field remarks : text { label "Remarks" description "Additional observations or notes from the examination" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-5.2" }
+  field overall_result : boolean { label "Overall result" description "PASS if all suitability items are met; FAIL otherwise" required true true_label "Pass" false_label "Fail" ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.3" }
   pass_fail { criteria "" pass_if "ocl{overall_result = 'pass'}" }
 }
 form r60-3/table-6.9 {
@@ -8758,6 +8810,7 @@ form r60-3/table-6.9 {
   header r60-3/header-b
   section "R 60-3, 6.9"
   requirements { /req/metrological/barometric-pressure }
+  ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.4"
   ref requirement "urn:oiml:pub:r:60-1:2021#clause-5.6.2"
   ref test-procedure "urn:oiml:pub:r:60-2:2021#clause-2.10.4"
   ref calculation "urn:oiml:pub:r:60-3:2021#clause-2.1.6"
@@ -8765,15 +8818,15 @@ form r60-3/table-6.9 {
   ref report-format "urn:oiml:pub:r:60-3:2021#table-7"
   calculation_context { dimensions true }
   conformance_process /conf/metrological-tests/barometric-pressure
-  field conversion_factor_f : number { label "Conversion factor (f)" definition "Ratio of indication change to load change at 75% of Max. Converts counts to verification units (v)." unit "counts/v" symbol f bind sample.test_context.conversion_factor_f required true measurement_method computed calculation conversionFactor calculation_bindings { avgIndicationAt75pct: reference_indication_75pct indicationAtDmin: indication_at_dmin n: n_test_intervals} specification_reference "R 60-3, 2.1.2.4" }
+  field conversion_factor_f : number { label "Conversion factor (f)" definition "Ratio of indication change to load change at 75% of Max. Converts counts to verification units (v)." unit "counts/v" symbol f bind sample.test_context.conversion_factor_f required true measurement_method computed calculation conversionFactor calculation_bindings { avgIndicationAt75pct: reference_indication_75pct indicationAtDmin: indication_at_dmin n: n_test_intervals} ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.1.2.4" specification_reference "R 60-3, 2.1.2.4" }
   field reference_indication_75pct : number { label "Reference indication at 75%" definition "Average indication at the 75% load point, used to compute f." unit "counts" required true measurement_method direct }
   field indication_at_dmin : number { label "Indication at D_min" definition "Load cell indication at minimum test load (D_min), used to compute f." unit "counts" required true measurement_method direct }
-  field n_lc : integer { label "Number of verification intervals (n_LC)" definition "Maximum number of load cell verification intervals n_LC, declared by the manufacturer." symbol nLC bind group.parameters.n_lc required true measurement_method declared specification_reference "R 60-1, 3.5.8" }
-  field emax : number { label "Maximum capacity (E_max)" definition "Maximum capacity of the load cell." unit "g, kg, or t" symbol Emax bind model.parameters.e_max required true measurement_method declared specification_reference "R 60-1, 3.5.5" }
-  field emin : number { label "Minimum dead load (E_min)" definition "Minimum dead load of the load cell." unit "g, kg, or t" symbol Emin bind family.parameters.e_min measurement_method declared specification_reference "R 60-1, 3.5.9" }
-  field y : integer { label "Relative v_min (Y)" definition "Ratio of the maximum measuring range to v_min (Y = (E_max - E_min)/v_min)." symbol Y bind group.parameters.y measurement_method declared specification_reference "R 60-1, 3.5.15" }
-  field n_test_intervals : number { label "Verification intervals of the tested range (n)" definition "Number of verification intervals of the measuring range under test — (E_max − E_min)/v_min when the test spans the classified range (R 60-3, 2.1.2.4). Input n of the conversion-factor calculation." symbol n measurement_method derived derivation "ocl{(emax - emin) / vmin}" specification_reference "R 60-3, 2.1.2.4" }
-  field vmin : number { label "Minimum verification interval (v_min)" definition "The minimum load cell verification interval. The maximum permissible change per kPa equals v_min." unit "g, kg, or t" symbol vmin bind group.parameters.v_min required true measurement_method declared specification_reference "R 60-1, 5.1.3" }
+  field n_lc : integer { label "Number of verification intervals (n_LC)" definition "Maximum number of load cell verification intervals n_LC, declared by the manufacturer." symbol nLC bind group.parameters.n_lc required true measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.8" specification_reference "R 60-1, 3.5.8" }
+  field emax : number { label "Maximum capacity (E_max)" definition "Maximum capacity of the load cell." unit "g, kg, or t" symbol Emax bind model.parameters.e_max required true measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.5" specification_reference "R 60-1, 3.5.5" }
+  field emin : number { label "Minimum dead load (E_min)" definition "Minimum dead load of the load cell." unit "g, kg, or t" symbol Emin bind family.parameters.e_min measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.9" specification_reference "R 60-1, 3.5.9" }
+  field y : integer { label "Relative v_min (Y)" definition "Ratio of the maximum measuring range to v_min (Y = (E_max - E_min)/v_min)." symbol Y bind group.parameters.y measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.15" specification_reference "R 60-1, 3.5.15" }
+  field n_test_intervals : number { label "Verification intervals of the tested range (n)" definition "Number of verification intervals of the measuring range under test — (E_max − E_min)/v_min when the test spans the classified range (R 60-3, 2.1.2.4). Input n of the conversion-factor calculation." symbol n measurement_method derived derivation "ocl{(emax - emin) / vmin}" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.1.2.4" specification_reference "R 60-3, 2.1.2.4" }
+  field vmin : number { label "Minimum verification interval (v_min)" definition "The minimum load cell verification interval. The maximum permissible change per kPa equals v_min." unit "g, kg, or t" symbol vmin bind group.parameters.v_min required true measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-5.1.3" specification_reference "R 60-1, 5.1.3" }
   field pressure_readings : array {
     label "Barometric pressure readings"
     definition "Minimum dead load output indication at different barometric pressures. Minimum 2 readings at different pressures required."
@@ -8783,14 +8836,14 @@ form r60-3/table-6.9 {
       field pressure : number { label "Pressure" definition "Barometric pressure at the time of the reading." unit "kPa" required true measurement_method direct }
       field indication : number { label "Indication" definition "Load cell indication at minimum dead load at this barometric pressure." unit "counts" required true measurement_method direct }
       field time : string { label "Time" definition "Absolute time of the reading (HH:MM)." pattern "\\d{2}:\\d{2}" measurement_method direct }
-      field change_v : number { label "Change (v)" definition "Change in indication from the prior pressure reading, divided by f, in verification units." unit "v" symbol CP measurement_method derived derivation "ocl{if $index = 0 then 0 else (indication - $prev.indication) / conversion_factor_f endif}" specification_reference "R 60-3, 2.1.6" }
-      field delta_p : number { label "Pressure step (ΔP)" definition "Pressure span of this step (P_2 − P_1). The baseline row carries 1 kPa — inert, since its C_P is 0 — so the canonical verdict derivation is defined on every row." unit "kPa" symbol delta_p measurement_method derived derivation "ocl{if $index = 0 then 1 else abs(pressure - $prev.pressure) endif}" specification_reference "R 60-3, 2.1.6" }
-      field change_per_kpa : number { label "Change (v_min/kPa)" definition "Pressure-induced change normalized per kPa and converted to v_min units via (E_max − E_min)/n_LC — the canonical barometric_normalized verdict quantity." unit "v_min/kPa" symbol CP-vmin verdict barometric_normalized measurement_method derived specification_reference "R 60-3, 2.1.6" }
-      field mpc : number { label "MPC (v_min/kPa)" definition "Maximum permissible change per kPa = 1 v_min per kPa (R 60-1, 5.6.2)." unit "v_min/kPa" measurement_method declared derivation "ocl{1}" specification_reference "R 60-1, 5.6.2" }
-      field within_mpc : boolean { label "Within MPC" definition "Evaluation: whether the pressure-induced change per kPa is within the MPC." measurement_method evaluated evaluation { rule "" verdict barometric_normalized op lte limit "ocl{1}" condition "|C_P(v_min/kPa)| <= 1 v_min per kPa" specification_reference "R 60-1, 5.6.2" } true_label "Yes" false_label "No" }
+      field change_v : number { label "Change (v)" definition "Change in indication from the prior pressure reading, divided by f, in verification units." unit "v" symbol CP measurement_method derived derivation "ocl{if $index = 0 then 0 else (indication - $prev.indication) / conversion_factor_f endif}" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.1.6" specification_reference "R 60-3, 2.1.6" }
+      field delta_p : number { label "Pressure step (ΔP)" definition "Pressure span of this step (P_2 − P_1). The baseline row carries 1 kPa — inert, since its C_P is 0 — so the canonical verdict derivation is defined on every row." unit "kPa" symbol delta_p measurement_method derived derivation "ocl{if $index = 0 then 1 else abs(pressure - $prev.pressure) endif}" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.1.6" specification_reference "R 60-3, 2.1.6" }
+      field change_per_kpa : number { label "Change (v_min/kPa)" definition "Pressure-induced change normalized per kPa and converted to v_min units via (E_max − E_min)/n_LC — the canonical barometric_normalized verdict quantity." unit "v_min/kPa" symbol CP-vmin verdict barometric_normalized measurement_method derived ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.1.6" specification_reference "R 60-3, 2.1.6" }
+      field mpc : number { label "MPC (v_min/kPa)" definition "Maximum permissible change per kPa = 1 v_min per kPa (R 60-1, 5.6.2)." unit "v_min/kPa" measurement_method declared derivation "ocl{1}" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-5.6.2" specification_reference "R 60-1, 5.6.2" }
+      field within_mpc : boolean { label "Within MPC" definition "Evaluation: whether the pressure-induced change per kPa is within the MPC." measurement_method evaluated evaluation { rule "" verdict barometric_normalized op lte limit "ocl{1}" condition "|C_P(v_min/kPa)| <= 1 v_min per kPa" specification_reference "R 60-1, 5.6.2" } true_label "Yes" false_label "No" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-5.6.2" }
     }
   }
-  field overall_result : boolean { label "Overall result" definition "PASS iff all barometric pressure effects are within MPC." required true measurement_method evaluated evaluation { rule "ocl{pressure_readings->forAll(r | r.within_mpc)}" condition "All |C_P| per kPa <= 1 v_min" specification_reference "R 60-1, 5.6.2" } true_label "Pass" false_label "Fail" }
+  field overall_result : boolean { label "Overall result" definition "PASS iff all barometric pressure effects are within MPC." required true measurement_method evaluated evaluation { rule "ocl{pressure_readings->forAll(r | r.within_mpc)}" condition "All |C_P| per kPa <= 1 v_min" specification_reference "R 60-1, 5.6.2" } true_label "Pass" false_label "Fail" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-5.6.2" }
   pass_fail { criteria "C_P(v_min) <= 1 v_min per 1 kPa" pass_if "ocl{pressure_readings->forAll(r | r.within_mpc)}" }
 }
 form r60-3/form-6.14 {
@@ -8800,6 +8853,7 @@ form r60-3/form-6.14 {
   header r60-3/header-a
   section "R 60-3, 6.14"
   requirements { /req/electronic/disturbances }
+  ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.7.6"
   ref requirement "urn:oiml:pub:r:60-1:2021#clause-5.7.2.5"
   ref test-procedure "urn:oiml:pub:r:60-2:2021#clause-2.10.7.6"
   ref calculation "urn:oiml:pub:r:60-3:2021#clause-2.2.4"
@@ -8857,6 +8911,7 @@ form r60-3/form-6.18 {
   header r60-3/header-a
   section "R 60-3, 6.18"
   requirements { /req/electronic/disturbances }
+  ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.7.10"
   ref requirement "urn:oiml:pub:r:60-1:2021#clause-5.7.2.5"
   ref test-procedure "urn:oiml:pub:r:60-2:2021#clause-2.10.7.10"
   ref calculation "urn:oiml:pub:r:60-3:2021#clause-2.2.8"
@@ -8929,6 +8984,8 @@ form r60-3/table-6.8 {
   header r60-3/header-a
   section "R 60-3, 6.8"
   requirements { /req/metrological/creep /req/metrological/creep-20-30 /req/metrological/dr }
+  ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.2"
+  ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.3"
   ref requirement "urn:oiml:pub:r:60-1:2021#clause-5.5.1"
   ref requirement "urn:oiml:pub:r:60-1:2021#clause-5.5.2"
   ref test-procedure "urn:oiml:pub:r:60-2:2021#clause-2.10.2"
@@ -8940,15 +8997,15 @@ form r60-3/table-6.8 {
   ref report-format "urn:oiml:pub:r:60-3:2021#table-6"
   calculation_context { dimensions true tables { mpe_tiers } }
   conformance_process { /conf/metrological-tests/creep /conf/metrological-tests/dr }
-  field conversion_factor_f : number { label "Conversion factor (f)" definition "Ratio of indication change to load change at 75% of Max. Converts counts to verification units (v)." unit "counts/v" symbol f bind sample.test_context.conversion_factor_f required true measurement_method computed calculation conversionFactor calculation_bindings { avgIndicationAt75pct: reference_indication_75pct indicationAtDmin: indication_at_dmin n: n_test_intervals} specification_reference "R 60-3, 2.1.2.4" }
+  field conversion_factor_f : number { label "Conversion factor (f)" definition "Ratio of indication change to load change at 75% of Max. Converts counts to verification units (v)." unit "counts/v" symbol f bind sample.test_context.conversion_factor_f required true measurement_method computed calculation conversionFactor calculation_bindings { avgIndicationAt75pct: reference_indication_75pct indicationAtDmin: indication_at_dmin n: n_test_intervals} ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.1.2.4" specification_reference "R 60-3, 2.1.2.4" }
   field reference_indication_75pct : number { label "Reference indication at 75%" definition "Average indication at the 75% load point, used to compute f." unit "counts" required true measurement_method direct }
   field indication_at_dmin : number { label "Indication at D_min" definition "Load cell indication at minimum test load (D_min) used to compute f." unit "counts" required true measurement_method direct }
-  field n_lc : integer { label "Number of verification intervals (n_LC)" definition "Maximum number of load cell verification intervals n_LC, declared by the manufacturer." symbol nLC bind group.parameters.n_lc required true measurement_method declared specification_reference "R 60-1, 3.5.8" }
-  field y : integer { label "Relative v_min (Y)" definition "Ratio of the maximum measuring range to v_min (Y = (E_max - E_min)/v_min)." symbol Y bind group.parameters.y measurement_method declared specification_reference "R 60-1, 3.5.15" }
-  field emax : number { label "Maximum capacity (E_max)" definition "Maximum capacity of the load cell." unit "g, kg, or t" symbol Emax bind model.parameters.e_max required true measurement_method declared specification_reference "R 60-1, 3.5.5" }
-  field emin : number { label "Minimum dead load (E_min)" definition "Minimum dead load of the load cell." unit "g, kg, or t" symbol Emin bind family.parameters.e_min measurement_method declared specification_reference "R 60-1, 3.5.9" }
-  field vmin : number { label "Minimum verification interval (v_min)" definition "Minimum load cell verification interval." unit "g, kg, or t" symbol vmin bind group.parameters.v_min required true measurement_method declared specification_reference "R 60-1, 3.5.11" }
-  field n_test_intervals : number { label "Verification intervals of the tested range (n)" definition "Number of verification intervals of the measuring range under test — (E_max − E_min)/v_min when the test spans the classified range (R 60-3, 2.1.2.4). Input n of the conversion-factor calculation." symbol n measurement_method derived derivation "ocl{(emax - emin) / vmin}" specification_reference "R 60-3, 2.1.2.4" }
+  field n_lc : integer { label "Number of verification intervals (n_LC)" definition "Maximum number of load cell verification intervals n_LC, declared by the manufacturer." symbol nLC bind group.parameters.n_lc required true measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.8" specification_reference "R 60-1, 3.5.8" }
+  field y : integer { label "Relative v_min (Y)" definition "Ratio of the maximum measuring range to v_min (Y = (E_max - E_min)/v_min)." symbol Y bind group.parameters.y measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.15" specification_reference "R 60-1, 3.5.15" }
+  field emax : number { label "Maximum capacity (E_max)" definition "Maximum capacity of the load cell." unit "g, kg, or t" symbol Emax bind model.parameters.e_max required true measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.5" specification_reference "R 60-1, 3.5.5" }
+  field emin : number { label "Minimum dead load (E_min)" definition "Minimum dead load of the load cell." unit "g, kg, or t" symbol Emin bind family.parameters.e_min measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.9" specification_reference "R 60-1, 3.5.9" }
+  field vmin : number { label "Minimum verification interval (v_min)" definition "Minimum load cell verification interval." unit "g, kg, or t" symbol vmin bind group.parameters.v_min required true measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.11" specification_reference "R 60-1, 3.5.11" }
+  field n_test_intervals : number { label "Verification intervals of the tested range (n)" definition "Number of verification intervals of the measuring range under test — (E_max − E_min)/v_min when the test spans the classified range (R 60-3, 2.1.2.4). Input n of the conversion-factor calculation." symbol n measurement_method derived derivation "ocl{(emax - emin) / vmin}" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.1.2.4" specification_reference "R 60-3, 2.1.2.4" }
   field dmin : number { label "Minimum test load (D_min)" definition "The minimum test load (dead load) applied during the creep test." unit "g, kg, or t" symbol Dmin bind sample.test_context.d_min required true measurement_method declared }
   field dmax : number { label "Maximum test load (D_max)" definition "The maximum test load applied during the creep test." unit "g, kg, or t" symbol Dmax bind sample.test_context.d_max required true measurement_method declared }
   field initial_dmin_indication : number { label "Initial D_min indication" definition "The load cell indication (counts) at D_min before the creep load is applied. Reference point for DR calculation." unit "counts" measurement_method direct }
@@ -8958,13 +9015,14 @@ form r60-3/table-6.8 {
     definition "Time-series indication readings during the creep test at D_max (and D_min). Creep is the change in indication over time under constant load."
     items { object }
     series { axis elapsed_min { unit "min" role time } cell { symbol change_v unit "v" } }
+    ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.2"
     fields {
       field test_load : string { label "Test load" definition "The load applied at this reading point: D_min or D_max." measurement_method declared }
       field indication_counts : number { label "Indication (counts)" definition "Load cell indication reading at this time point." unit "counts" measurement_method direct }
-      field elapsed_min : number { label "Elapsed time (min)" definition "Time elapsed since the initial D_max loading, in minutes. The numeric time axis of the series — verdicts address readings by it (t = 20, t = 30 per R 60-3, 2.1.5.2), never by string matching or by extreme value." unit "min" measurement_method direct specification_reference "R 60-3, 2.1.5.2" }
+      field elapsed_min : number { label "Elapsed time (min)" definition "Time elapsed since the initial D_max loading, in minutes. The numeric time axis of the series — verdicts address readings by it (t = 20, t = 30 per R 60-3, 2.1.5.2), never by string matching or by extreme value." unit "min" measurement_method direct ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.1.5.2" specification_reference "R 60-3, 2.1.5.2" }
       field indication_time : string { label "Indication time" definition "Absolute time of the reading (HH:MM:SS)." pattern "\\d{2}:\\d{2}:\\d{2}" measurement_method direct }
       field barometric_pressure : number { label "Barometric pressure" definition "Atmospheric pressure at time of reading, for correction if needed." unit "kPa" measurement_method direct }
-      field change_v : number { label "Creep change (v)" definition "Change in indication from the initial D_max loading, divided by f, in verification units." unit "v" symbol CC measurement_method derived calculation creep calculation_bindings { indicationAtTime: indication_counts initialIndication: initial_dmax_indication conversion_factor_f: conversion_factor_f} specification_reference "R 60-3, 2.1.5" }
+      field change_v : number { label "Creep change (v)" definition "Change in indication from the initial D_max loading, divided by f, in verification units." unit "v" symbol CC measurement_method derived calculation creep calculation_bindings { indicationAtTime: indication_counts initialIndication: initial_dmax_indication conversion_factor_f: conversion_factor_f} ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.1.5" specification_reference "R 60-3, 2.1.5" }
       field elapsed_time : string { label "Elapsed time" definition "Time elapsed since the initial D_max loading (mm:ss) — recorded display companion of the numeric elapsed_min axis (verdicts address readings by elapsed_min, never by this string)." measurement_method direct }
     }
   }
@@ -8972,26 +9030,27 @@ form r60-3/table-6.8 {
     label "DR readings"
     definition "Minimum dead load output return measurements after the creep test. DR is the difference between the final and initial D_min indications."
     items { object }
+    ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.3"
     fields {
       field indication_counts : number { label "Indication (counts)" definition "Load cell indication after returning to D_min." unit "counts" measurement_method direct }
       field indication_time : string { label "Time" definition "Absolute time of DR reading (HH:MM:SS)." pattern "\\d{2}:\\d{2}:\\d{2}" measurement_method direct }
       field barometric_pressure : number { label "Barometric pressure" definition "Atmospheric pressure at time of DR reading." unit "kPa" measurement_method direct }
-      field change_v : number { label "DR change (v)" definition "Change from initial D_min indication, divided by f. This is the dead load output return C_DR." unit "v" symbol CDR measurement_method derived calculation deadLoadOutputReturn calculation_bindings { minLoadIndication2: indication_counts minLoadIndication1: initial_dmin_indication conversion_factor_f: conversion_factor_f} specification_reference "R 60-3, 2.1.5.4" }
+      field change_v : number { label "DR change (v)" definition "Change from initial D_min indication, divided by f. This is the dead load output return C_DR." unit "v" symbol CDR measurement_method derived calculation deadLoadOutputReturn calculation_bindings { minLoadIndication2: indication_counts minLoadIndication1: initial_dmin_indication conversion_factor_f: conversion_factor_f} ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.1.5.4" specification_reference "R 60-3, 2.1.5.4" }
     }
   }
   field max_creep_change_v : number { label "Maximum creep change (v)" definition "Maximum creep change across all D_max readings in verification units." unit "v" symbol CC measurement_method derived derivation "ocl{creep_readings->collect(r | r.change_v)->max()}" }
-  field creep_30min : number { label "Creep at 30 min (v)" definition "Creep change at exactly the 30-minute reading, in verification units." unit "v" symbol CC measurement_method derived derivation "ocl{reading_at(window(creep_readings->select(r | r.test_load = 'D_max'), 'elapsed_min', 20, 30), 'elapsed_min', 30, 'change_v')}" specification_reference "R 60-3, 2.1.5.2" }
-  field creep_20min : number { label "Creep at 20 min (v)" definition "Creep change at the 20-minute reading, in verification units." unit "v" symbol CC measurement_method derived derivation "ocl{reading_at(window(creep_readings->select(r | r.test_load = 'D_max'), 'elapsed_min', 20, 30), 'elapsed_min', 20, 'change_v')}" specification_reference "R 60-3, 2.1.5.2" }
-  field creep_30_20_diff : number { label "Creep 30-20 difference (v)" definition "Difference between creep at 30 min and 20 min per R 60-3, 2.1.5.2." unit "v" symbol CC-30-20 measurement_method derived derivation "ocl{creep_30min - creep_20min}" specification_reference "R 60-3, 2.1.5.2" }
-  field mpe_at_dmax : number { label "MPE at D_max (v), p_LC = 0.7" definition "Maximum permissible error at D_max with p_LC forced to 0.7 for creep evaluation per R 60-1, 5.5.1." unit "v" symbol MPE measurement_method lookup calculation mpe calculation_bindings { load: dmax accuracy_class: accuracy_class p_lc: plc_for_creep} specification_reference "R 60-1, 5.5.1" }
+  field creep_30min : number { label "Creep at 30 min (v)" definition "Creep change at exactly the 30-minute reading, in verification units." unit "v" symbol CC measurement_method derived derivation "ocl{reading_at(window(creep_readings->select(r | r.test_load = 'D_max'), 'elapsed_min', 20, 30), 'elapsed_min', 30, 'change_v')}" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.1.5.2" specification_reference "R 60-3, 2.1.5.2" }
+  field creep_20min : number { label "Creep at 20 min (v)" definition "Creep change at the 20-minute reading, in verification units." unit "v" symbol CC measurement_method derived derivation "ocl{reading_at(window(creep_readings->select(r | r.test_load = 'D_max'), 'elapsed_min', 20, 30), 'elapsed_min', 20, 'change_v')}" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.1.5.2" specification_reference "R 60-3, 2.1.5.2" }
+  field creep_30_20_diff : number { label "Creep 30-20 difference (v)" definition "Difference between creep at 30 min and 20 min per R 60-3, 2.1.5.2." unit "v" symbol CC-30-20 measurement_method derived derivation "ocl{creep_30min - creep_20min}" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.1.5.2" specification_reference "R 60-3, 2.1.5.2" }
+  field mpe_at_dmax : number { label "MPE at D_max (v), p_LC = 0.7" definition "Maximum permissible error at D_max with p_LC forced to 0.7 for creep evaluation per R 60-1, 5.5.1." unit "v" symbol MPE measurement_method lookup calculation mpe calculation_bindings { load: dmax accuracy_class: accuracy_class p_lc: plc_for_creep} ref derives-from "urn:oiml:pub:r:60-1:2021#clause-5.5.1" specification_reference "R 60-1, 5.5.1" }
   field plc_for_creep : number { label "Apportionment factor for creep" definition "Apportionment factor fixed at 0.7 for creep MPE evaluation per R 60-1, 5.5.1." measurement_method declared default 0.7 }
   field dr_value : number { label "DR value (v)" definition "Final dead load output return value in verification units." unit "v" symbol CDR measurement_method derived derivation "ocl{dr_readings->collect(r | r.change_v)->last()}" }
   field actual_time_s : number { label "Actual test duration" definition "Duration of the creep test in seconds." unit "s" measurement_method direct }
   field specified_time_s : number { label "Specified test duration" definition "Required test duration per R 60-2 in seconds." unit "s" measurement_method declared specification_reference "R 60-2, 2.10.2" }
-  field mpe_for_dr : number { label "MPE for DR" definition "Maximum permissible error for DR evaluation = 0.5 v." unit "v" measurement_method declared specification_reference "R 60-1, 5.5.2" }
-  field creep_30min_result : boolean { label "30-min creep result" definition "Whether the total creep over 30 minutes is within 0.7 x |MPE| at D_max." measurement_method evaluated evaluation { rule "ocl{abs(max_creep_change_v) <= 0.7 * abs(mpe_at_dmax)}" condition "|C_C(30 min)| <= 0.7 x |MPE|" specification_reference "R 60-1, 5.5.1" } true_label "Pass" false_label "Fail" }
-  field creep_20_30_result : boolean { label "20-30 min creep result" definition "Whether the creep change between 20 and 30 minutes is within 0.15 x |MPE|." measurement_method evaluated evaluation { rule "ocl{abs(creep_30min - creep_20min) <= 0.15 * abs(mpe_at_dmax)}" condition "|C_C(30-20)| <= 0.15 x |MPE|" specification_reference "R 60-1, 5.5.1" } true_label "Pass" false_label "Fail" }
-  field dr_half_v_result : boolean { label "DR <= 0.5 v result" definition "Whether the dead load output return does not exceed 0.5 v." measurement_method evaluated evaluation { rule "ocl{if actual_time_s / specified_time_s <= 1 then abs(dr_value) <= 0.5 else abs(dr_value) <= 0.5 * (1 - (actual_time_s / specified_time_s - 1)) endif}" condition "|C_DR| <= 0.5(1 - (x-1)) v with x = actual time/specified time (relaxed rule for 100-150 % loading times, R 60-3, 2.1.5.6)" specification_reference "R 60-3, 2.1.5.6" } true_label "Pass" false_label "Fail" }
+  field mpe_for_dr : number { label "MPE for DR" definition "Maximum permissible error for DR evaluation = 0.5 v." unit "v" measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-5.5.2" specification_reference "R 60-1, 5.5.2" }
+  field creep_30min_result : boolean { label "30-min creep result" definition "Whether the total creep over 30 minutes is within 0.7 x |MPE| at D_max." measurement_method evaluated evaluation { rule "ocl{abs(max_creep_change_v) <= 0.7 * abs(mpe_at_dmax)}" condition "|C_C(30 min)| <= 0.7 x |MPE|" specification_reference "R 60-1, 5.5.1" } true_label "Pass" false_label "Fail" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-5.5.1" }
+  field creep_20_30_result : boolean { label "20-30 min creep result" definition "Whether the creep change between 20 and 30 minutes is within 0.15 x |MPE|." measurement_method evaluated evaluation { rule "ocl{abs(creep_30min - creep_20min) <= 0.15 * abs(mpe_at_dmax)}" condition "|C_C(30-20)| <= 0.15 x |MPE|" specification_reference "R 60-1, 5.5.1" } true_label "Pass" false_label "Fail" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-5.5.1" }
+  field dr_half_v_result : boolean { label "DR <= 0.5 v result" definition "Whether the dead load output return does not exceed 0.5 v." measurement_method evaluated evaluation { rule "ocl{if actual_time_s / specified_time_s <= 1 then abs(dr_value) <= 0.5 else abs(dr_value) <= 0.5 * (1 - (actual_time_s / specified_time_s - 1)) endif}" condition "|C_DR| <= 0.5(1 - (x-1)) v with x = actual time/specified time (relaxed rule for 100-150 % loading times, R 60-3, 2.1.5.6)" specification_reference "R 60-3, 2.1.5.6" } true_label "Pass" false_label "Fail" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.1.5.6" }
   field dr_within_manuf_spec_result : boolean { label "DR within manufacturer spec" definition "Whether DR is within the manufacturer's specified DR value (if different from 0.5 v) — assessed by the evaluator against the declared group DR; no machine-computable rule (the declared DR is a group-level characteristic outside this form's sample scope)." measurement_method declared true_label "Pass" false_label "Fail" }
   pass_fail { criteria "30-min creep C_C(t) <= 0.7 * |MPE|; 20-30 min difference C_C(30-20) <= 0.15 * |MPE|; C_DR <= 0.5 v (if time intervals met)" pass_if "ocl{creep_30min_result and creep_20_30_result and dr_half_v_result}" }
 }
@@ -9002,6 +9061,7 @@ form r60-3/form-6.17 {
   header r60-3/header-a
   section "R 60-3, 6.17"
   requirements { /req/electronic/disturbances }
+  ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.7.9"
   ref requirement "urn:oiml:pub:r:60-1:2021#clause-5.7.2.5"
   ref test-procedure "urn:oiml:pub:r:60-2:2021#clause-2.10.7.9"
   ref calculation "urn:oiml:pub:r:60-3:2021#clause-2.2.7"
@@ -9054,6 +9114,7 @@ form r60-3/form-6.16 {
   header r60-3/header-a
   section "R 60-3, 6.16"
   requirements { /req/electronic/disturbances }
+  ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.7.8"
   ref requirement "urn:oiml:pub:r:60-1:2021#clause-5.7.2.5"
   ref test-procedure "urn:oiml:pub:r:60-2:2021#clause-2.10.7.8"
   ref calculation "urn:oiml:pub:r:60-3:2021#clause-2.2.6"
@@ -9153,6 +9214,7 @@ form r60-3/table-6.10.1 {
   header r60-3/header-b
   section "R 60-3, 6.10.1"
   requirements { /req/metrological/humidity-ch }
+  ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.5"
   ref requirement "urn:oiml:pub:r:60-1:2021#clause-5.6.3"
   ref test-procedure "urn:oiml:pub:r:60-2:2021#clause-2.10.5"
   ref calculation "urn:oiml:pub:r:60-3:2021#clause-2.1.7"
@@ -9174,16 +9236,16 @@ form r60-3/table-6.10.1 {
   ref report-format "urn:oiml:pub:r:60-3:2021#table-13"
   calculation_context { dimensions true tables { mpe_tiers } }
   conformance_process /conf/metrological-tests/humidity-ch
-  field conversion_factor_f : number { label "Conversion Factor F" definition "Ratio of indication change to load change at 75% of Max. Converts counts to verification units (v)." unit "counts/v" symbol f bind sample.test_context.conversion_factor_f required true measurement_method computed calculation conversionFactor calculation_bindings { avgIndicationAt75pct: reference_indication_75pct indicationAtDmin: indication_at_dmin n: n_test_intervals} specification_reference "R 60-3, 2.1.2.4" }
+  field conversion_factor_f : number { label "Conversion Factor F" definition "Ratio of indication change to load change at 75% of Max. Converts counts to verification units (v)." unit "counts/v" symbol f bind sample.test_context.conversion_factor_f required true measurement_method computed calculation conversionFactor calculation_bindings { avgIndicationAt75pct: reference_indication_75pct indicationAtDmin: indication_at_dmin n: n_test_intervals} ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.1.2.4" specification_reference "R 60-3, 2.1.2.4" }
   field reference_indication_75pct : number { label "Reference indication at 75%" definition "Average indication at the 75% load point, used to compute f." unit "counts" required true measurement_method direct }
   field indication_at_dmin : number { label "Indication at D_min" definition "Load cell indication at minimum test load (D_min), used to compute f." unit "counts" required true measurement_method direct }
-  field nlc : integer { label "Maximum number of verification intervals (n_LC)" definition "The maximum number of load cell verification intervals. Required for computing C_Hmin limit." symbol nLC bind group.parameters.n_lc required true measurement_method declared specification_reference "R 60-1, 5.1.3" }
-  field y : integer { label "Relative v_min (Y)" definition "Ratio of the maximum measuring range to v_min (Y = (E_max - E_min)/v_min)." symbol Y bind group.parameters.y measurement_method declared specification_reference "R 60-1, 3.5.15" }
-  field emax : number { label "Maximum capacity (E_max)" definition "Maximum capacity of the load cell." unit "g, kg, or t" symbol Emax bind model.parameters.e_max required true measurement_method declared specification_reference "R 60-1, 3.5.5" }
-  field emin : number { label "Minimum dead load (E_min)" definition "Minimum dead load of the load cell." unit "g, kg, or t" symbol Emin bind family.parameters.e_min measurement_method declared specification_reference "R 60-1, 3.5.9" }
-  field vmin : number { label "Minimum verification interval (v_min)" definition "Minimum load cell verification interval." unit "g, kg, or t" symbol vmin bind group.parameters.v_min required true measurement_method declared specification_reference "R 60-1, 3.5.11" }
-  field n_test_intervals : number { label "Verification intervals of the tested range (n)" definition "Number of verification intervals of the measuring range under test — (E_max − E_min)/v_min when the test spans the classified range (R 60-3, 2.1.2.4). Input n of the conversion-factor calculation." symbol n measurement_method derived derivation "ocl{(emax - emin) / vmin}" specification_reference "R 60-3, 2.1.2.4" }
-  field plc : number { label "Apportionment factor (p_LC)" definition "Apportionment factor applied to MPE. Default 0.7." symbol pLC bind family.parameters.p_lc measurement_method declared default 0.7 specification_reference "R 60-1, 3.7.2" }
+  field nlc : integer { label "Maximum number of verification intervals (n_LC)" definition "The maximum number of load cell verification intervals. Required for computing C_Hmin limit." symbol nLC bind group.parameters.n_lc required true measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-5.1.3" specification_reference "R 60-1, 5.1.3" }
+  field y : integer { label "Relative v_min (Y)" definition "Ratio of the maximum measuring range to v_min (Y = (E_max - E_min)/v_min)." symbol Y bind group.parameters.y measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.15" specification_reference "R 60-1, 3.5.15" }
+  field emax : number { label "Maximum capacity (E_max)" definition "Maximum capacity of the load cell." unit "g, kg, or t" symbol Emax bind model.parameters.e_max required true measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.5" specification_reference "R 60-1, 3.5.5" }
+  field emin : number { label "Minimum dead load (E_min)" definition "Minimum dead load of the load cell." unit "g, kg, or t" symbol Emin bind family.parameters.e_min measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.9" specification_reference "R 60-1, 3.5.9" }
+  field vmin : number { label "Minimum verification interval (v_min)" definition "Minimum load cell verification interval." unit "g, kg, or t" symbol vmin bind group.parameters.v_min required true measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.11" specification_reference "R 60-1, 3.5.11" }
+  field n_test_intervals : number { label "Verification intervals of the tested range (n)" definition "Number of verification intervals of the measuring range under test — (E_max − E_min)/v_min when the test spans the classified range (R 60-3, 2.1.2.4). Input n of the conversion-factor calculation." symbol n measurement_method derived derivation "ocl{(emax - emin) / vmin}" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.1.2.4" specification_reference "R 60-3, 2.1.2.4" }
+  field plc : number { label "Apportionment factor (p_LC)" definition "Apportionment factor applied to MPE. Default 0.7." symbol pLC bind family.parameters.p_lc measurement_method declared default 0.7 ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.7.2" specification_reference "R 60-1, 3.7.2" }
   field dmin : number { label "Minimum test load (D_min)" definition "Minimum test load applied during the humidity test." unit "g, kg, or t" symbol Dmin bind sample.test_context.d_min required true measurement_method declared }
   field dmax : number { label "Maximum test load (D_max)" definition "Maximum test load applied during the humidity test." unit "g, kg, or t" symbol Dmax bind sample.test_context.d_max required true measurement_method declared }
   field summary : object {
@@ -9200,25 +9262,25 @@ form r60-3/table-6.10.1 {
           field time_before : string { label "Time Before" definition "Time of before-humidity reading." measurement_method direct }
           field indication_after : number { label "Indication After" definition "Load cell indication at this load after humidity exposure." unit "counts" measurement_method direct }
           field time_after : string { label "Time After" definition "Time of after-humidity reading." measurement_method direct }
-          field change_v : number { label "Change V" definition "Change in indication due to humidity exposure, in verification units." unit "v" measurement_method derived derivation "ocl{(indication_after - indication_before) / conversion_factor_f}" specification_reference "R 60-3, 2.1.7" }
+          field change_v : number { label "Change V" definition "Change in indication due to humidity exposure, in verification units." unit "v" measurement_method derived derivation "ocl{(indication_after - indication_before) / conversion_factor_f}" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.1.7" specification_reference "R 60-3, 2.1.7" }
           field mpc_v : number { label "MPC V" definition "Maximum permissible change at this load point (MPE at the applied load, R 60-1, Table 4)." unit "v" measurement_method lookup calculation mpe calculation_bindings { load: test_load accuracy_class: accuracy_class p_lc: plc} }
         }
       }
       field avg_indication_dmin_before : number { label "Avg Indication Dmin Before" definition "Average indication at D_min before humidity exposure." unit "counts" measurement_method derived derivation "ocl{test_loads->select(r | r.test_load = dmin)->collect(r | r.indication_before)->average()}" }
       field avg_indication_dmin_after : number { label "Avg Indication Dmin After" definition "Average indication at D_min after humidity exposure." unit "counts" measurement_method derived derivation "ocl{test_loads->select(r | r.test_load = dmin)->collect(r | r.indication_after)->average()}" }
-      field chmin : number { label "C_Hmin" definition "Humidity effect on minimum test load indication: (avg_after - avg_before) / f, in verification units." unit "v" symbol CHmin measurement_method derived calculation humidityCHmin calculation_bindings { indDminAfter: avg_indication_dmin_after indDminBefore: avg_indication_dmin_before conversion_factor_f: conversion_factor_f} specification_reference "R 60-3, 2.1.7.1" }
-      field chmin_limit : number { label "C_Hmin Limit (4% Y)" definition "Maximum permissible humidity effect on minimum test load: 4% of the (E_max - E_min) output, i.e. 0.04·Y in v units (R 60-1, 5.6.3)." unit "v" measurement_method computed derivation "ocl{0.04 * y}" specification_reference "R 60-1, 5.6.3" }
-      field chmin_result : boolean { label "C_Hmin Result" definition "Evaluation: whether |C_Hmin| is within the 4% n_LC limit." measurement_method evaluated evaluation { rule "ocl{abs(chmin) <= chmin_limit}" condition "|C_Hmin| <= 4% * Y" specification_reference "R 60-1, 5.6.3.1" } true_label "Pass" false_label "Fail" }
+      field chmin : number { label "C_Hmin" definition "Humidity effect on minimum test load indication: (avg_after - avg_before) / f, in verification units." unit "v" symbol CHmin measurement_method derived calculation humidityCHmin calculation_bindings { indDminAfter: avg_indication_dmin_after indDminBefore: avg_indication_dmin_before conversion_factor_f: conversion_factor_f} ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.1.7.1" specification_reference "R 60-3, 2.1.7.1" }
+      field chmin_limit : number { label "C_Hmin Limit (4% Y)" definition "Maximum permissible humidity effect on minimum test load: 4% of the (E_max - E_min) output, i.e. 0.04·Y in v units (R 60-1, 5.6.3)." unit "v" measurement_method computed derivation "ocl{0.04 * y}" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-5.6.3" specification_reference "R 60-1, 5.6.3" }
+      field chmin_result : boolean { label "C_Hmin Result" definition "Evaluation: whether |C_Hmin| is within the 4% n_LC limit." measurement_method evaluated evaluation { rule "ocl{abs(chmin) <= chmin_limit}" condition "|C_Hmin| <= 4% * Y" specification_reference "R 60-1, 5.6.3.1" } true_label "Pass" false_label "Fail" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-5.6.3.1" }
       field avg_indication_dmax_before : number { label "Avg Indication Dmax Before" definition "Average indication at D_max before humidity exposure." unit "counts" measurement_method derived derivation "ocl{test_loads->select(r | r.test_load = dmax)->collect(r | r.indication_before)->average()}" }
       field avg_indication_dmax_after : number { label "Avg Indication Dmax After" definition "Average indication at D_max after humidity exposure." unit "counts" measurement_method derived derivation "ocl{test_loads->select(r | r.test_load = dmax)->collect(r | r.indication_after)->average()}" }
-      field chmax : number { label "C_Hmax" definition "Humidity effect on the span: change in the difference (D_max - D_min) indication due to humidity exposure, in verification units." unit "v" symbol CHmax measurement_method derived calculation humidityCHmax calculation_bindings { avgDmaxAfter: avg_indication_dmax_after avgDminAfter: avg_indication_dmin_after avgDmaxBefore: avg_indication_dmax_before avgDminBefore: avg_indication_dmin_before conversion_factor_f: conversion_factor_f} specification_reference "R 60-3, 2.1.7" }
-      field chmax_limit : number { label "C_Hmax Limit (1 v)" definition "Maximum permissible humidity effect on maximum load: one load cell verification interval (R 60-1, 5.6.3)." unit "v" symbol MPE measurement_method declared default 1 specification_reference "R 60-1, 5.6.3" source_discrepancy { summary "R 60-3, 2.1.7 states the max-load humidity effect limit as ≤ MPE, contradicting R 60-1, 5.6.3.1 (≤ 1 v)" sources { "urn:oiml:pub:r:60-1:2021#clause-5.6.3.1" "urn:oiml:pub:r:60-3:2021#clause-2.1.7" } resolution follows_clause_x rationale "This form follows the normative Part 1 limit of 1 v, which R 60-3's own Table 6.10.1-a mpc column (= 1) confirms; only R 60-3, 2.1.7 prose states ≤ MPE. See analysis/deep-audit-r60.md F5." } }
-      field chmax_result : boolean { label "C_Hmax Result" definition "Evaluation: whether |C_Hmax| is within |MPE|." measurement_method evaluated evaluation { rule "ocl{abs(chmax) <= abs(chmax_limit)}" condition "|C_Hmax| <= |MPE|" specification_reference "R 60-1, 5.6.3" } true_label "Pass" false_label "Fail" }
+      field chmax : number { label "C_Hmax" definition "Humidity effect on the span: change in the difference (D_max - D_min) indication due to humidity exposure, in verification units." unit "v" symbol CHmax measurement_method derived calculation humidityCHmax calculation_bindings { avgDmaxAfter: avg_indication_dmax_after avgDminAfter: avg_indication_dmin_after avgDmaxBefore: avg_indication_dmax_before avgDminBefore: avg_indication_dmin_before conversion_factor_f: conversion_factor_f} ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.1.7" specification_reference "R 60-3, 2.1.7" }
+      field chmax_limit : number { label "C_Hmax Limit (1 v)" definition "Maximum permissible humidity effect on maximum load: one load cell verification interval (R 60-1, 5.6.3)." unit "v" symbol MPE measurement_method declared default 1 ref derives-from "urn:oiml:pub:r:60-1:2021#clause-5.6.3" specification_reference "R 60-1, 5.6.3" source_discrepancy { summary "R 60-3, 2.1.7 states the max-load humidity effect limit as ≤ MPE, contradicting R 60-1, 5.6.3.1 (≤ 1 v)" sources { "urn:oiml:pub:r:60-1:2021#clause-5.6.3.1" "urn:oiml:pub:r:60-3:2021#clause-2.1.7" } resolution follows_clause_x rationale "This form follows the normative Part 1 limit of 1 v, which R 60-3's own Table 6.10.1-a mpc column (= 1) confirms; only R 60-3, 2.1.7 prose states ≤ MPE. See analysis/deep-audit-r60.md F5." } }
+      field chmax_result : boolean { label "C_Hmax Result" definition "Evaluation: whether |C_Hmax| is within |MPE|." measurement_method evaluated evaluation { rule "ocl{abs(chmax) <= abs(chmax_limit)}" condition "|C_Hmax| <= |MPE|" specification_reference "R 60-1, 5.6.3" } true_label "Pass" false_label "Fail" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-5.6.3" }
     }
   }
   field load_test_before : array { subform_ref load-test-row { } label "Load test before humidity exposure" definition "R 60-3 table 6.10.1(b) for classes C/D, 6.10.1(d) for classes A/B. Load test data taken before humidity exposure. n_runs resolves at runtime from the active accuracy_class via the conformance test's instances: 3 for C/D, 5 for A/B (static shape: C/D)." }
   field load_test_after : array { subform_ref load-test-row { } label "Load test after humidity exposure" definition "R 60-3 table 6.10.1(c) for classes C/D, 6.10.1(e) for classes A/B. Load test data taken after humidity exposure. n_runs resolves at runtime from the active accuracy_class via the conformance test's instances: 3 for C/D, 5 for A/B (static shape: C/D)." }
-  field overall_result : boolean { label "Overall Result" definition "PASS iff both C_Hmin and C_Hmax evaluations pass." required true measurement_method evaluated evaluation { rule "ocl{summary.chmin_result and summary.chmax_result}" condition "C_Hmin <= 4% * Y AND C_Hmax <= 1 v (R 60-1, 5.6.3)" specification_reference "R 60-1, 5.6.3" } true_label "Pass" false_label "Fail" }
+  field overall_result : boolean { label "Overall Result" definition "PASS iff both C_Hmin and C_Hmax evaluations pass." required true measurement_method evaluated evaluation { rule "ocl{summary.chmin_result and summary.chmax_result}" condition "C_Hmin <= 4% * Y AND C_Hmax <= 1 v (R 60-1, 5.6.3)" specification_reference "R 60-1, 5.6.3" } true_label "Pass" false_label "Fail" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-5.6.3" }
   pass_fail { criteria "C_Hmin <= 4% of (E_max - E_min) output; C_Hmax <= 1 v (R 60-1, 5.6.3)" pass_if "ocl{summary.chmin_result and summary.chmax_result}" }
 }
 form r60-3/table-6.10.2 {
@@ -9228,6 +9290,7 @@ form r60-3/table-6.10.2 {
   header r60-3/header-a
   section "R 60-3, 6.10.2"
   requirements { /req/metrological/humidity-sh }
+  ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.6"
   ref requirement "urn:oiml:pub:r:60-1:2021#clause-5.6.3.2"
   ref test-procedure "urn:oiml:pub:r:60-2:2021#clause-2.10.6"
   ref calculation "urn:oiml:pub:r:60-3:2021#clause-2.1.8"
@@ -9242,11 +9305,11 @@ form r60-3/table-6.10.2 {
   field dmin : number { label "Minimum test load (D_min)" unit "g, kg, or t" symbol Dmin bind sample.test_context.d_min required true measurement_method declared }
   field dmax : number { label "Maximum test load (D_max)" unit "g, kg, or t" symbol Dmax bind sample.test_context.d_max required true measurement_method declared }
   field nlc : integer { label "Number of verification intervals (n_LC)" symbol nLC bind group.parameters.n_lc required true measurement_method declared }
-  field y : integer { label "Relative v_min (Y)" definition "Ratio of the maximum measuring range to v_min (Y = (E_max - E_min)/v_min)." symbol Y bind group.parameters.y measurement_method declared specification_reference "R 60-1, 3.5.15" }
-  field emax : number { label "Maximum capacity (E_max)" definition "Maximum capacity of the load cell." unit "g, kg, or t" symbol Emax bind model.parameters.e_max required true measurement_method declared specification_reference "R 60-1, 3.5.5" }
-  field emin : number { label "Minimum dead load (E_min)" definition "Minimum dead load of the load cell." unit "g, kg, or t" symbol Emin bind family.parameters.e_min measurement_method declared specification_reference "R 60-1, 3.5.9" }
-  field vmin : number { label "Minimum verification interval (v_min)" definition "Minimum load cell verification interval." unit "g, kg, or t" symbol vmin bind group.parameters.v_min required true measurement_method declared specification_reference "R 60-1, 3.5.11" }
-  field n_test_intervals : number { label "Verification intervals of the tested range (n)" definition "Number of verification intervals of the measuring range under test — (E_max − E_min)/v_min when the test spans the classified range (R 60-3, 2.1.2.4). Input n of the conversion-factor calculation." symbol n measurement_method derived derivation "ocl{(emax - emin) / vmin}" specification_reference "R 60-3, 2.1.2.4" }
+  field y : integer { label "Relative v_min (Y)" definition "Ratio of the maximum measuring range to v_min (Y = (E_max - E_min)/v_min)." symbol Y bind group.parameters.y measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.15" specification_reference "R 60-1, 3.5.15" }
+  field emax : number { label "Maximum capacity (E_max)" definition "Maximum capacity of the load cell." unit "g, kg, or t" symbol Emax bind model.parameters.e_max required true measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.5" specification_reference "R 60-1, 3.5.5" }
+  field emin : number { label "Minimum dead load (E_min)" definition "Minimum dead load of the load cell." unit "g, kg, or t" symbol Emin bind family.parameters.e_min measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.9" specification_reference "R 60-1, 3.5.9" }
+  field vmin : number { label "Minimum verification interval (v_min)" definition "Minimum load cell verification interval." unit "g, kg, or t" symbol vmin bind group.parameters.v_min required true measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.11" specification_reference "R 60-1, 3.5.11" }
+  field n_test_intervals : number { label "Verification intervals of the tested range (n)" definition "Number of verification intervals of the measuring range under test — (E_max − E_min)/v_min when the test spans the classified range (R 60-3, 2.1.2.4). Input n of the conversion-factor calculation." symbol n measurement_method derived derivation "ocl{(emax - emin) / vmin}" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.1.2.4" specification_reference "R 60-3, 2.1.2.4" }
   field plc : number { label "Apportionment factor (p_LC)" symbol pLC bind family.parameters.p_lc measurement_method declared default 0.7 }
   field page_load_test_before : string { label "Page of Load Test Before Humidity" }
   field page_load_test_during : string { label "Page of Load Test During Humidity" }
@@ -9288,7 +9351,7 @@ form r60-3/table-6.10.2 {
       field mpe : number { label "MPE" unit "v" symbol MPE measurement_method lookup calculation mpe calculation_bindings { load: test_load accuracy_class: accuracy_class p_lc: plc} }
     }
   }
-  field overall_result : boolean { label "Overall Result" required true measurement_method evaluated evaluation { rule "ocl{test_loads->forAll(l | abs(l.condition_20c_50rh.error_EL) <= abs(l.mpe) and abs(l.condition_high_85rh.error_EL) <= abs(l.mpe) and abs(l.condition_20c_return.error_EL) <= abs(l.mpe))}" condition "All |E_L| <= |MPE| at all humidity conditions" specification_reference "R 60-1, 5.6.3" } true_label "Pass" false_label "Fail" }
+  field overall_result : boolean { label "Overall Result" required true measurement_method evaluated evaluation { rule "ocl{test_loads->forAll(l | abs(l.condition_20c_50rh.error_EL) <= abs(l.mpe) and abs(l.condition_high_85rh.error_EL) <= abs(l.mpe) and abs(l.condition_20c_return.error_EL) <= abs(l.mpe))}" condition "All |E_L| <= |MPE| at all humidity conditions" specification_reference "R 60-1, 5.6.3" } true_label "Pass" false_label "Fail" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-5.6.3" }
   pass_fail { criteria "All |E_L| <= |MPE| at all humidity conditions" pass_if "ocl{test_loads->forAll(l | abs(l.condition_20c_50rh.error_EL) <= abs(l.mpe) and abs(l.condition_high_85rh.error_EL) <= abs(l.mpe) and abs(l.condition_20c_return.error_EL) <= abs(l.mpe))}" }
 }
 form r60-3/sec-6.2 {
@@ -9296,6 +9359,7 @@ form r60-3/sec-6.2 {
   description "Initial tests and general notes — units, measurement range, conditions, input impedance"
   data_class FormInstance#data
   section "R 60-3, 6.2"
+  ref derives-from "urn:oiml:pub:r:60-3:2021#clause-6.2"
   ref requirement "urn:oiml:pub:r:60-1:2021#clause-5.2"
   ref requirement "urn:oiml:pub:r:60-1:2021#clause-5.5.2"
   ref test-procedure "urn:oiml:pub:r:60-2:2021#clause-2.8.1"
@@ -9312,6 +9376,7 @@ form r60-3/sec-6.2 {
     description "Unit (e.g. counts, digits, g, kg, t) in which the measurement result is displayed"
     default "[{\"r60_reference\":\"2.10.1\",\"test_procedure\":\"Measurement error, repeatability error and temperature effect on minimum dead load output\"},{\"r60_reference\":\"2.10.2\",\"test_procedure\":\"Determination of creep error\"},{\"r60_reference\":\"2.10.3\",\"test_procedure\":\"Minimum dead load output return (DR)\"},{\"r60_reference\":\"2.10.4\",\"test_procedure\":\"Barometric pressure effects (Atmospheric pressure)\"},{\"r60_reference\":\"2.10.5\",\"test_procedure\":\"Humidity effects for load cells marked with CH or no mark\"},{\"r60_reference\":\"2.10.6\",\"test_procedure\":\"Humidity effects for load cells marked SH\"},{\"r60_reference\":\"2.10.7\",\"test_procedure\":\"Additional tests for analogue-active cells\"}]"
     items { object }
+    ref derives-from "urn:oiml:pub:r:60-3:2021#clause-6.2.1/table-1"
     fields {
       field r60_reference : string { label "R 60-2 reference" }
       field test_procedure : string { label "Test procedure" }
@@ -9323,6 +9388,7 @@ form r60-3/sec-6.2 {
     description "D_max, D_min, and conversion factor for each test procedure"
     default "[{\"test_procedure_ref\":\"2.10.1\"},{\"test_procedure_ref\":\"2.10.2\"},{\"test_procedure_ref\":\"2.10.3\"},{\"test_procedure_ref\":\"2.10.4\"},{\"test_procedure_ref\":\"2.10.5\"},{\"test_procedure_ref\":\"2.10.6\"},{\"test_procedure_ref\":\"2.10.7\"}]"
     items { object }
+    ref derives-from "urn:oiml:pub:r:60-3:2021#clause-6.2.2/table-1"
     fields {
       field test_procedure_ref : string { label "Test procedure (R 60-2 ref)" }
       field dmax : number { label "D_max" bind sample.test_context.d_max }
@@ -9331,12 +9397,13 @@ form r60-3/sec-6.2 {
       field fulfils_requirements : boolean { label "Fulfils requirements" true_label "Yes" false_label "No" }
     }
   }
-  field measurement_range_passed : boolean { label "Measurement range passed" true_label "Yes" false_label "No" }
+  field measurement_range_passed : boolean { label "Measurement range passed" true_label "Yes" false_label "No" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-6.2.2/table-1" }
   field conditions_check : array {
     label "Conditions"
     description "Verify v_min <= (D_max - D_min) / n with n = n_LC, n_LC - 500, n_LC - 1000"
     default "[{\"test_procedure_ref\":\"2.10.1\"},{\"test_procedure_ref\":\"2.10.2\"},{\"test_procedure_ref\":\"2.10.3\"},{\"test_procedure_ref\":\"2.10.4\"},{\"test_procedure_ref\":\"2.10.5\"},{\"test_procedure_ref\":\"2.10.6\"},{\"test_procedure_ref\":\"2.10.7\"}]"
     items { object }
+    ref derives-from "urn:oiml:pub:r:60-3:2021#clause-6.2.3/table-1"
     fields {
       field test_procedure_ref : string { label "Test procedure (R 60-2 ref)" }
       field dmin : number { label "D_min" bind sample.test_context.d_min }
@@ -9347,10 +9414,11 @@ form r60-3/sec-6.2 {
       field check_nlc_1000 : boolean { label "Fulfilled with n_LC - 1000" true_label "Yes" false_label "No" }
     }
   }
-  field conditions_passed : boolean { label "Conditions passed" true_label "Yes" false_label "No" }
+  field conditions_passed : boolean { label "Conditions passed" true_label "Yes" false_label "No" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-6.2.3/table-1" }
   field input_impedance : object {
     label "Input impedance"
     description "Measured input impedance compared to specification in R 60-3, 4.5"
+    ref derives-from "urn:oiml:pub:r:60-3:2021#clause-6.2.4"
     fields {
       field measured_value : number { label "Measured value" unit "Ohm" }
       field specified_value : number { label "Specified value" unit "Ohm" bind family.parameters.input_impedance }
@@ -9365,6 +9433,7 @@ form r60-3/table-6.5 {
   header r60-3/header-a
   section "R 60-3, 6.5"
   requirements { /req/metrological/mpe }
+  ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.1.12"
   ref requirement "urn:oiml:pub:r:60-1:2021#clause-5.3.1"
   ref test-procedure "urn:oiml:pub:r:60-2:2021#clause-2.10.1.12"
   ref calculation "urn:oiml:pub:r:60-3:2021#clause-2.1.2.2"
@@ -9372,20 +9441,20 @@ form r60-3/table-6.5 {
   ref report-format "urn:oiml:pub:r:60-3:2021#table-3"
   calculation_context { dimensions true tables { mpe_tiers } }
   conformance_process /conf/metrological-tests/measurement-error-repeatability-mdlo
-  field conversion_factor_f : number { label "Conversion factor (f)" definition "Ratio of the change in indication to the corresponding change in load at 75% of maximum capacity. Converts counts to verification units (v)." unit "counts/v" symbol f bind sample.test_context.conversion_factor_f required true measurement_method computed calculation conversionFactor calculation_bindings { avgIndicationAt75pct: reference_indication_75pct indicationAtDmin: indication_at_dmin n: n_test_intervals} specification_reference "R 60-3, 2.1.2.4" }
+  field conversion_factor_f : number { label "Conversion factor (f)" definition "Ratio of the change in indication to the corresponding change in load at 75% of maximum capacity. Converts counts to verification units (v)." unit "counts/v" symbol f bind sample.test_context.conversion_factor_f required true measurement_method computed calculation conversionFactor calculation_bindings { avgIndicationAt75pct: reference_indication_75pct indicationAtDmin: indication_at_dmin n: n_test_intervals} ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.1.2.4" specification_reference "R 60-3, 2.1.2.4" }
   field indication_at_dmin : number { label "Indication at D_min" definition "Load cell indication at minimum test load (D_min), used as the lower reference point for computing f." unit "counts" required true measurement_method direct }
-  field n_lc : integer { label "Number of verification intervals (n_LC)" definition "Maximum number of load cell verification intervals n_LC, declared by the manufacturer." symbol nLC bind group.parameters.n_lc required true measurement_method declared specification_reference "R 60-1, 3.5.8" }
-  field y : integer { label "Relative v_min (Y)" definition "Ratio of the maximum measuring range to v_min (Y = (E_max - E_min)/v_min)." symbol Y bind group.parameters.y measurement_method declared specification_reference "R 60-1, 3.5.15" }
-  field emax : number { label "Maximum capacity (E_max)" definition "Maximum capacity of the load cell." unit "g, kg, or t" symbol Emax bind model.parameters.e_max required true measurement_method declared specification_reference "R 60-1, 3.5.5" }
-  field emin : number { label "Minimum dead load (E_min)" definition "Minimum dead load of the load cell." unit "g, kg, or t" symbol Emin bind family.parameters.e_min measurement_method declared specification_reference "R 60-1, 3.5.9" }
-  field vmin : number { label "Minimum verification interval (v_min)" definition "Minimum load cell verification interval." unit "g, kg, or t" symbol vmin bind group.parameters.v_min required true measurement_method declared specification_reference "R 60-1, 3.5.11" }
-  field n_test_intervals : number { label "Verification intervals of the tested range (n)" definition "Number of verification intervals of the measuring range under test — (E_max − E_min)/v_min when the test spans the classified range (R 60-3, 2.1.2.4). Input n of the conversion-factor calculation." symbol n measurement_method derived derivation "ocl{(emax - emin) / vmin}" specification_reference "R 60-3, 2.1.2.4" }
-  field v_mass : number { label "Verification interval (v, mass)" definition "The load cell verification interval of the tested range in mass units — (D_max − D_min)/n. Used to express loads in v for the changeover-point evaluation." unit "g, kg, or t" symbol v measurement_method derived derivation "ocl{(dmax - dmin) / n_test_intervals}" specification_reference "R 60-1, 3.5.4" }
+  field n_lc : integer { label "Number of verification intervals (n_LC)" definition "Maximum number of load cell verification intervals n_LC, declared by the manufacturer." symbol nLC bind group.parameters.n_lc required true measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.8" specification_reference "R 60-1, 3.5.8" }
+  field y : integer { label "Relative v_min (Y)" definition "Ratio of the maximum measuring range to v_min (Y = (E_max - E_min)/v_min)." symbol Y bind group.parameters.y measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.15" specification_reference "R 60-1, 3.5.15" }
+  field emax : number { label "Maximum capacity (E_max)" definition "Maximum capacity of the load cell." unit "g, kg, or t" symbol Emax bind model.parameters.e_max required true measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.5" specification_reference "R 60-1, 3.5.5" }
+  field emin : number { label "Minimum dead load (E_min)" definition "Minimum dead load of the load cell." unit "g, kg, or t" symbol Emin bind family.parameters.e_min measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.9" specification_reference "R 60-1, 3.5.9" }
+  field vmin : number { label "Minimum verification interval (v_min)" definition "Minimum load cell verification interval." unit "g, kg, or t" symbol vmin bind group.parameters.v_min required true measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.11" specification_reference "R 60-1, 3.5.11" }
+  field n_test_intervals : number { label "Verification intervals of the tested range (n)" definition "Number of verification intervals of the measuring range under test — (E_max − E_min)/v_min when the test spans the classified range (R 60-3, 2.1.2.4). Input n of the conversion-factor calculation." symbol n measurement_method derived derivation "ocl{(emax - emin) / vmin}" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.1.2.4" specification_reference "R 60-3, 2.1.2.4" }
+  field v_mass : number { label "Verification interval (v, mass)" definition "The load cell verification interval of the tested range in mass units — (D_max − D_min)/n. Used to express loads in v for the changeover-point evaluation." unit "g, kg, or t" symbol v measurement_method derived derivation "ocl{(dmax - dmin) / n_test_intervals}" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.4" specification_reference "R 60-1, 3.5.4" }
   field dmin : number { label "Minimum test load (D_min)" definition "The minimum test load applied during the test. The lower bound of the measurement range." unit "g, kg, or t" symbol Dmin bind sample.test_context.d_min required true measurement_method declared }
   field dmax : number { label "Maximum test load (D_max)" definition "The maximum test load applied during the test. The upper bound of the measurement range." unit "g, kg, or t" symbol Dmax bind sample.test_context.d_max required true measurement_method declared }
   field test_load_75pct : number { label "75% test load" definition "Test load at 75% of maximum capacity (E_max), used to determine the conversion factor f." unit "g, kg, or t" required true measurement_method declared targets { /req/metrological/mpe } }
   field reference_indication_75pct : number { label "Reference indication at 75%" definition "Average indication at the 75% load point, used as the reference for computing the conversion factor." unit "counts" required true measurement_method direct }
-  field plc : number { label "Apportionment factor (p_LC)" definition "The apportionment factor applied to MPE values. Default 0.7 per R 60-1, 3.7.2 unless otherwise marked." symbol pLC bind family.parameters.p_lc measurement_method declared default 0.7 specification_reference "R 60-1, 3.7.2, 5.3.2" }
+  field plc : number { label "Apportionment factor (p_LC)" definition "The apportionment factor applied to MPE values. Default 0.7 per R 60-1, 3.7.2 unless otherwise marked." symbol pLC bind family.parameters.p_lc measurement_method declared default 0.7 ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.7.2" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-5.3.2" specification_reference "R 60-1, 3.7.2, 5.3.2" }
   field temperature_series : array {
     label "Temperature test series"
     definition "Load cell error measurements at each of four test temperatures per R 60-2 Table 6: 20°C, T_1, T_2, 20°C (return)"
@@ -9405,18 +9474,18 @@ form r60-3/table-6.5 {
           field test_load : number { label "Test load" definition "The applied test load at this measurement point, in mass units." unit "g, kg, or t" required true measurement_method direct }
           field direction : enum { label "Direction" definition "Whether this reading is in the increasing or decreasing load sequence (hysteresis per R 60-1, 5.3)" required true measurement_method direct enum_values { increasing decreasing } }
           field indication : number { label "Indication" definition "The load cell output reading (in counts) observed at this test load and temperature." unit "counts" required true measurement_method direct }
-          field reference_indication : number { label "Reference indication (R_i)" definition "Reference indication at this test load, computed from the test load, D_min, D_max, n, and f per R 60-3, 2.1.2.6." unit "indication units" symbol Ri required true measurement_method computed calculation referenceIndication calculation_bindings { testLoad: test_load d_min: dmin d_max: dmax n: n_test_intervals conversion_factor_f: conversion_factor_f} specification_reference "R 60-3, 2.1.2.6" }
-          field error_EL : number { label "Error (E_L)" definition "Load cell error at this point: the signed difference between observed indication and reference indication, divided by the conversion factor f, expressed in verification units (v)." unit "v" symbol EL required true measurement_method derived calculation loadCellError calculation_bindings { avgIndication: indication referenceIndication: reference_indication conversion_factor_f: conversion_factor_f} specification_reference "R 60-3, 2.1.2.2" }
-          field mpe : number { label "MPE" definition "Maximum permissible error for this test load, determined by the accuracy class tier table (R 60-1, Table 4). The absolute error must not exceed this value." unit "v" symbol MPE measurement_method lookup calculation mpe calculation_bindings { load: test_load accuracy_class: accuracy_class p_lc: plc} specification_reference "R 60-1, 5.3.1, Table 4" }
-          field within_mpe : boolean { label "Within MPE" definition "Evaluation result: whether the absolute load cell error is within the maximum permissible error at this point." measurement_method evaluated evaluation { rule "ocl{abs(error_EL) <= abs(mpe)}" condition "|E_L| <= |MPE|" specification_reference "R 60-1, 5.3.1" } true_label "Yes" false_label "No" }
+          field reference_indication : number { label "Reference indication (R_i)" definition "Reference indication at this test load, computed from the test load, D_min, D_max, n, and f per R 60-3, 2.1.2.6." unit "indication units" symbol Ri required true measurement_method computed calculation referenceIndication calculation_bindings { testLoad: test_load d_min: dmin d_max: dmax n: n_test_intervals conversion_factor_f: conversion_factor_f} ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.1.2.6" specification_reference "R 60-3, 2.1.2.6" }
+          field error_EL : number { label "Error (E_L)" definition "Load cell error at this point: the signed difference between observed indication and reference indication, divided by the conversion factor f, expressed in verification units (v)." unit "v" symbol EL required true measurement_method derived calculation loadCellError calculation_bindings { avgIndication: indication referenceIndication: reference_indication conversion_factor_f: conversion_factor_f} ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.1.2.2" specification_reference "R 60-3, 2.1.2.2" }
+          field mpe : number { label "MPE" definition "Maximum permissible error for this test load, determined by the accuracy class tier table (R 60-1, Table 4). The absolute error must not exceed this value." unit "v" symbol MPE measurement_method lookup calculation mpe calculation_bindings { load: test_load accuracy_class: accuracy_class p_lc: plc} ref derives-from "urn:oiml:pub:r:60-1:2021#clause-5.3.1" specification_reference "R 60-1, 5.3.1, Table 4" }
+          field within_mpe : boolean { label "Within MPE" definition "Evaluation result: whether the absolute load cell error is within the maximum permissible error at this point." measurement_method evaluated evaluation { rule "ocl{abs(error_EL) <= abs(mpe)}" condition "|E_L| <= |MPE|" specification_reference "R 60-1, 5.3.1" } true_label "Yes" false_label "No" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-5.3.1" }
           field changeover : object {
             label "Changeover point evaluation (digital cells)"
             definition "For digital load cells with an output interval greater than 0.20 v, the error prior to rounding is evaluated via the changeover point: P = I + ½v − ΔL, E = P − L, E_c = E − E_0 ≤ MPE (R 60-2, 2.10.7.2). Leave empty for analogue cells."
             fields {
-              field delta_l : number { label "Additional load (ΔL)" definition "Additional load successively added until the digital output increases unambiguously by one output increment (I + v)." unit "g, kg, or t" measurement_method direct specification_reference "R 60-2, 2.10.7.2" }
-              field error_prior_rounding : number { label "Error prior to rounding (E, v)" definition "E = P − L with P = I + ½v − ΔL, expressed in v: indication/f + 0.5 − ΔL/v − L/v." unit "v" measurement_method derived derivation "ocl{indication / conversion_factor_f + 0.5 - delta_l / v_mass - test_load / v_mass}" specification_reference "R 60-2, 2.10.7.2" }
-              field error_corrected : number { label "Corrected error (E_c, v)" definition "E_c = E − E_0, with E_0 the prior-rounding error at the minimum test load D_min (the D_min row of this series)." unit "v" symbol EC measurement_method derived derivation "ocl{error_prior_rounding - test_loads->select(r | r.test_load = dmin)->first().changeover.error_prior_rounding}" specification_reference "R 60-2, 2.10.7.2" }
-              field within_mpe_corrected : boolean { label "E_c within MPE" definition "Evaluation: whether the corrected error prior to rounding is within the MPE (R 60-2, 2.10.7.2: E_c ≤ MPE)." measurement_method evaluated evaluation { rule "ocl{abs(error_corrected) <= abs(mpe)}" condition "|E_c| <= |MPE|" specification_reference "R 60-2, 2.10.7.2" } true_label "Yes" false_label "No" }
+              field delta_l : number { label "Additional load (ΔL)" definition "Additional load successively added until the digital output increases unambiguously by one output increment (I + v)." unit "g, kg, or t" measurement_method direct ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.7.2" specification_reference "R 60-2, 2.10.7.2" }
+              field error_prior_rounding : number { label "Error prior to rounding (E, v)" definition "E = P − L with P = I + ½v − ΔL, expressed in v: indication/f + 0.5 − ΔL/v − L/v." unit "v" measurement_method derived derivation "ocl{indication / conversion_factor_f + 0.5 - delta_l / v_mass - test_load / v_mass}" ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.7.2" specification_reference "R 60-2, 2.10.7.2" }
+              field error_corrected : number { label "Corrected error (E_c, v)" definition "E_c = E − E_0, with E_0 the prior-rounding error at the minimum test load D_min (the D_min row of this series)." unit "v" symbol EC measurement_method derived derivation "ocl{error_prior_rounding - test_loads->select(r | r.test_load = dmin)->first().changeover.error_prior_rounding}" ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.7.2" specification_reference "R 60-2, 2.10.7.2" }
+              field within_mpe_corrected : boolean { label "E_c within MPE" definition "Evaluation: whether the corrected error prior to rounding is within the MPE (R 60-2, 2.10.7.2: E_c ≤ MPE)." measurement_method evaluated evaluation { rule "ocl{abs(error_corrected) <= abs(mpe)}" condition "|E_c| <= |MPE|" specification_reference "R 60-2, 2.10.7.2" } true_label "Yes" false_label "No" ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.7.2" }
             }
           }
         }
@@ -9424,7 +9493,7 @@ form r60-3/table-6.5 {
     }
   }
   field dmin_pass : boolean { label "D_min result" definition "Whether the load cell passes the test at minimum test load." measurement_method evaluated true_label "Pass" false_label "Fail" }
-  field overall_result : boolean { label "Overall result" definition "Aggregate pass/fail: PASS if and only if every |E_L| <= |MPE| at every test load at every temperature." required true measurement_method evaluated evaluation { rule "ocl{temperature_series->forAll(t | t.test_loads->forAll(l | l.within_mpe))}" condition "All |E_L| <= |MPE| at every test load at every temperature" specification_reference "R 60-1, 5.3.1" } true_label "Pass" false_label "Fail" }
+  field overall_result : boolean { label "Overall result" definition "Aggregate pass/fail: PASS if and only if every |E_L| <= |MPE| at every test load at every temperature." required true measurement_method evaluated evaluation { rule "ocl{temperature_series->forAll(t | t.test_loads->forAll(l | l.within_mpe))}" condition "All |E_L| <= |MPE| at every test load at every temperature" specification_reference "R 60-1, 5.3.1" } true_label "Pass" false_label "Fail" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-5.3.1" }
   pass_fail { criteria "All |E_L| <= |MPE| for every test load at every temperature" pass_if "ocl{temperature_series->forAll(t | t.test_loads->forAll(l | l.within_mpe))}" }
 }
 form r60-3/table-6.3-6.4 {
@@ -9434,6 +9503,7 @@ form r60-3/table-6.3-6.4 {
   header r60-3/header-a
   section "R 60-3, 6.3 (3 runs) / 6.4 (5 runs)"
   requirements { /req/metrological/mpe /req/metrological/repeatability }
+  ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.1"
   ref requirement "urn:oiml:pub:r:60-1:2021#clause-5.3"
   ref test-procedure "urn:oiml:pub:r:60-2:2021#clause-2.10.1"
   ref calculation "urn:oiml:pub:r:60-3:2021#clause-2.1.2"
@@ -9453,6 +9523,8 @@ form r60-3/sec-6.1 {
   description "Results of the performance tests — data-derived from test form instances"
   data_class FormInstance#data
   section "R 60-3, 6.1"
+  ref derives-from "urn:oiml:pub:r:60-3:2021#clause-6.1"
+  ref derives-from "urn:oiml:pub:r:60-3:2021#clause-6.1.1"
   ref report-format "urn:oiml:pub:r:60-3:2021#clause-6.1"
   ref report-format "urn:oiml:pub:r:60-3:2021#clause-6.1.1"
   ref report-format "urn:oiml:pub:r:60-3:2021#clause-6.1/table-1"
@@ -9462,6 +9534,7 @@ form r60-3/sec-6.1 {
     label "Performance test results"
     description "Summary of base metrological performance tests — auto-derived from test form instances"
     items { object }
+    ref derives-from "urn:oiml:pub:r:60-3:2021#clause-6.1/table-1"
     fields {
       field form_id : string { label "Form" }
       field clause : string { label "Clause" }
@@ -9478,6 +9551,7 @@ form r60-3/sec-6.1 {
     label "Digital load cell test results"
     description "Summary of additional tests for digital load cells — auto-derived from test form instances"
     items { object }
+    ref derives-from "urn:oiml:pub:r:60-3:2021#clause-6.1.1/table-1"
     fields {
       field form_id : string { label "Form" }
       field clause : string { label "Clause" }
@@ -9498,6 +9572,7 @@ form r60-3/form-6.12 {
   header r60-3/header-b
   section "R 60-3, 6.12"
   requirements { /req/electronic/power-voltage-ac /req/electronic/power-voltage-dc /req/electronic/power-voltage-variations }
+  ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.7.4"
   ref requirement "urn:oiml:pub:r:60-1:2021#clause-5.7.2.2"
   ref requirement "urn:oiml:pub:r:60-1:2021#clause-5.7.2.3"
   ref requirement "urn:oiml:pub:r:60-1:2021#clause-5.7.2.4"
@@ -9576,6 +9651,7 @@ form r60-3/table-6.6 {
   header r60-3/header-a
   section "R 60-3, 6.6"
   requirements { /req/metrological/repeatability }
+  ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.1.15"
   ref requirement "urn:oiml:pub:r:60-1:2021#clause-5.4"
   ref test-procedure "urn:oiml:pub:r:60-2:2021#clause-2.10.1.15"
   ref calculation "urn:oiml:pub:r:60-3:2021#clause-2.1.3"
@@ -9583,16 +9659,16 @@ form r60-3/table-6.6 {
   ref report-format "urn:oiml:pub:r:60-3:2021#table-4"
   calculation_context { dimensions true tables { mpe_tiers } }
   conformance_process /conf/metrological-tests/measurement-error-repeatability-mdlo
-  field conversion_factor_f : number { label "Conversion factor (f)" definition "Ratio of indication change to load change at 75% of Max. Converts counts to verification units (v)." unit "counts/v" symbol f bind sample.test_context.conversion_factor_f required true measurement_method computed calculation conversionFactor calculation_bindings { avgIndicationAt75pct: reference_indication_75pct indicationAtDmin: indication_at_dmin n: n_test_intervals} specification_reference "R 60-3, 2.1.2.4" }
+  field conversion_factor_f : number { label "Conversion factor (f)" definition "Ratio of indication change to load change at 75% of Max. Converts counts to verification units (v)." unit "counts/v" symbol f bind sample.test_context.conversion_factor_f required true measurement_method computed calculation conversionFactor calculation_bindings { avgIndicationAt75pct: reference_indication_75pct indicationAtDmin: indication_at_dmin n: n_test_intervals} ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.1.2.4" specification_reference "R 60-3, 2.1.2.4" }
   field reference_indication_75pct : number { label "Reference indication at 75%" definition "Average indication at the 75% load point, used to compute f." unit "counts" required true measurement_method direct }
   field indication_at_dmin : number { label "Indication at D_min" definition "Load cell indication at minimum test load (D_min), used to compute f." unit "counts" required true measurement_method direct }
-  field n_lc : integer { label "Number of verification intervals (n_LC)" definition "Maximum number of load cell verification intervals n_LC, declared by the manufacturer." symbol nLC bind group.parameters.n_lc required true measurement_method declared specification_reference "R 60-1, 3.5.8" }
-  field y : integer { label "Relative v_min (Y)" definition "Ratio of the maximum measuring range to v_min (Y = (E_max - E_min)/v_min)." symbol Y bind group.parameters.y measurement_method declared specification_reference "R 60-1, 3.5.15" }
-  field emax : number { label "Maximum capacity (E_max)" definition "Maximum capacity of the load cell." unit "g, kg, or t" symbol Emax bind model.parameters.e_max required true measurement_method declared specification_reference "R 60-1, 3.5.5" }
-  field emin : number { label "Minimum dead load (E_min)" definition "Minimum dead load of the load cell." unit "g, kg, or t" symbol Emin bind family.parameters.e_min measurement_method declared specification_reference "R 60-1, 3.5.9" }
-  field vmin : number { label "Minimum verification interval (v_min)" definition "Minimum load cell verification interval." unit "g, kg, or t" symbol vmin bind group.parameters.v_min required true measurement_method declared specification_reference "R 60-1, 3.5.11" }
-  field n_test_intervals : number { label "Verification intervals of the tested range (n)" definition "Number of verification intervals of the measuring range under test — (E_max − E_min)/v_min when the test spans the classified range (R 60-3, 2.1.2.4). Input n of the conversion-factor calculation." symbol n measurement_method derived derivation "ocl{(emax - emin) / vmin}" specification_reference "R 60-3, 2.1.2.4" }
-  field plc : number { label "Apportionment factor (p_LC)" definition "Apportionment factor applied to MPE. Default 0.7 per R 60-1, 3.7.2 unless otherwise marked." symbol pLC bind family.parameters.p_lc measurement_method declared default 0.7 specification_reference "R 60-1, 3.7.2, 5.3.2" }
+  field n_lc : integer { label "Number of verification intervals (n_LC)" definition "Maximum number of load cell verification intervals n_LC, declared by the manufacturer." symbol nLC bind group.parameters.n_lc required true measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.8" specification_reference "R 60-1, 3.5.8" }
+  field y : integer { label "Relative v_min (Y)" definition "Ratio of the maximum measuring range to v_min (Y = (E_max - E_min)/v_min)." symbol Y bind group.parameters.y measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.15" specification_reference "R 60-1, 3.5.15" }
+  field emax : number { label "Maximum capacity (E_max)" definition "Maximum capacity of the load cell." unit "g, kg, or t" symbol Emax bind model.parameters.e_max required true measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.5" specification_reference "R 60-1, 3.5.5" }
+  field emin : number { label "Minimum dead load (E_min)" definition "Minimum dead load of the load cell." unit "g, kg, or t" symbol Emin bind family.parameters.e_min measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.9" specification_reference "R 60-1, 3.5.9" }
+  field vmin : number { label "Minimum verification interval (v_min)" definition "Minimum load cell verification interval." unit "g, kg, or t" symbol vmin bind group.parameters.v_min required true measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.11" specification_reference "R 60-1, 3.5.11" }
+  field n_test_intervals : number { label "Verification intervals of the tested range (n)" definition "Number of verification intervals of the measuring range under test — (E_max − E_min)/v_min when the test spans the classified range (R 60-3, 2.1.2.4). Input n of the conversion-factor calculation." symbol n measurement_method derived derivation "ocl{(emax - emin) / vmin}" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.1.2.4" specification_reference "R 60-3, 2.1.2.4" }
+  field plc : number { label "Apportionment factor (p_LC)" definition "Apportionment factor applied to MPE. Default 0.7 per R 60-1, 3.7.2 unless otherwise marked." symbol pLC bind family.parameters.p_lc measurement_method declared default 0.7 ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.7.2" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-5.3.2" specification_reference "R 60-1, 3.7.2, 5.3.2" }
   field temperature_series : array {
     label "Temperature test series"
     definition "Repeatability error measurements at each of four test temperatures (20°C, T_1, T_2, 20°C return)"
@@ -9617,14 +9693,14 @@ form r60-3/table-6.6 {
               field indication : number { label "Indication (counts)" unit "counts" required true measurement_method direct }
             }
           }
-          field repeatability_error_v : number { label "Repeatability error (E_R)" definition "Repeatability error in verification units: (max indication − min indication) / f." unit "v" symbol ER measurement_method derived calculation repeatabilityError calculation_bindings { indications: runs.indication conversion_factor_f: conversion_factor_f} specification_reference "R 60-3, 2.1.3" }
-          field mpe : number { label "MPE" definition "Maximum permissible error for this test load from the accuracy class tier table (R 60-1, Table 4)." unit "v" symbol MPE measurement_method lookup calculation mpe calculation_bindings { load: test_load accuracy_class: accuracy_class p_lc: plc} specification_reference "R 60-1, 5.4, Table 4" }
-          field within_mpe : boolean { label "Within MPE" definition "Evaluation: whether the repeatability error is within the MPE." measurement_method evaluated evaluation { rule "ocl{abs(repeatability_error_v) <= abs(mpe)}" condition "|E_R| <= |MPE|" specification_reference "R 60-1, 5.4" } true_label "Yes" false_label "No" }
+          field repeatability_error_v : number { label "Repeatability error (E_R)" definition "Repeatability error in verification units: (max indication − min indication) / f." unit "v" symbol ER measurement_method derived calculation repeatabilityError calculation_bindings { indications: runs.indication conversion_factor_f: conversion_factor_f} ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.1.3" specification_reference "R 60-3, 2.1.3" }
+          field mpe : number { label "MPE" definition "Maximum permissible error for this test load from the accuracy class tier table (R 60-1, Table 4)." unit "v" symbol MPE measurement_method lookup calculation mpe calculation_bindings { load: test_load accuracy_class: accuracy_class p_lc: plc} ref derives-from "urn:oiml:pub:r:60-1:2021#clause-5.4" specification_reference "R 60-1, 5.4, Table 4" }
+          field within_mpe : boolean { label "Within MPE" definition "Evaluation: whether the repeatability error is within the MPE." measurement_method evaluated evaluation { rule "ocl{abs(repeatability_error_v) <= abs(mpe)}" condition "|E_R| <= |MPE|" specification_reference "R 60-1, 5.4" } true_label "Yes" false_label "No" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-5.4" }
         }
       }
     }
   }
-  field overall_result : boolean { label "Overall result" definition "PASS iff |E_R| <= |MPE| at every test load at every temperature." required true measurement_method evaluated evaluation { rule "ocl{temperature_series->forAll(t | t.test_loads->forAll(l | l.within_mpe))}" condition "All |E_R| <= |MPE| at every test load at every temperature" specification_reference "R 60-1, 5.4" } true_label "Pass" false_label "Fail" }
+  field overall_result : boolean { label "Overall result" definition "PASS iff |E_R| <= |MPE| at every test load at every temperature." required true measurement_method evaluated evaluation { rule "ocl{temperature_series->forAll(t | t.test_loads->forAll(l | l.within_mpe))}" condition "All |E_R| <= |MPE| at every test load at every temperature" specification_reference "R 60-1, 5.4" } true_label "Pass" false_label "Fail" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-5.4" }
   pass_fail { criteria "All E_R <= |MPE| for every test load at every temperature" pass_if "ocl{temperature_series->forAll(t | t.test_loads->forAll(l | l.within_mpe))}" }
 }
 form r60-3/form-6.13 {
@@ -9634,6 +9710,7 @@ form r60-3/form-6.13 {
   header r60-3/header-a
   section "R 60-3, 6.13"
   requirements { /req/electronic/disturbances }
+  ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.7.5"
   ref requirement "urn:oiml:pub:r:60-1:2021#clause-5.7.2.5"
   ref test-procedure "urn:oiml:pub:r:60-2:2021#clause-2.10.7.5"
   ref calculation "urn:oiml:pub:r:60-3:2021#clause-2.2.3"
@@ -9676,6 +9753,7 @@ form r60-3/form-6.19 {
   header r60-3/header-a
   section "R 60-3, 6.19"
   requirements { /req/electronic/span-stability }
+  ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.7.11"
   ref requirement "urn:oiml:pub:r:60-1:2021#clause-5.7.2.6"
   ref test-procedure "urn:oiml:pub:r:60-2:2021#clause-2.10.7.11"
   ref calculation "urn:oiml:pub:r:60-3:2021#clause-2.2.9"
@@ -9708,7 +9786,7 @@ form r60-3/form-6.19 {
   applicability {
     accuracy_class: [B, C, D]
   }
-  field conversion_factor_f : number { label "Conversion Factor F" definition "Ratio of indication change to load change at 75% of Max. Converts counts to verification units (v)." unit "counts/v" bind sample.test_context.conversion_factor_f required true measurement_method computed specification_reference "R 60-3, 2.1.2.4" }
+  field conversion_factor_f : number { label "Conversion Factor F" definition "Ratio of indication change to load change at 75% of Max. Converts counts to verification units (v)." unit "counts/v" bind sample.test_context.conversion_factor_f required true measurement_method computed ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.1.2.4" specification_reference "R 60-3, 2.1.2.4" }
   field dmin_value : number { label "Minimum Test Load (D_min)" definition "The minimum test load applied at each measurement." unit "g, kg, or t" bind sample.test_context.d_min measurement_method declared }
   field dmax_value : number { label "Maximum Test Load (D_max)" definition "The maximum test load applied at each measurement." unit "g, kg, or t" bind sample.test_context.d_max measurement_method declared }
   field measurements : array {
@@ -9746,12 +9824,12 @@ form r60-3/form-6.19 {
           }
         }
       }
-      field avg_dmin : number { label "Average D_min Indication" definition "Mean of all run indications at D_min." unit "counts" measurement_method derived derivation "ocl{mean(readings.dmin->collect(r | r.indication))}" specification_reference "R 60-3, 2.2.9" }
-      field avg_dmax : number { label "Average D_max Indication" definition "Mean of all run indications at D_max." unit "counts" measurement_method derived derivation "ocl{mean(readings.dmax->collect(r | r.indication))}" specification_reference "R 60-3, 2.2.9" }
-      field span : number { label "Span" definition "The difference between average D_max and average D_min indications: avg_dmax - avg_dmin." unit "counts" measurement_method derived derivation "ocl{avg_dmax - avg_dmin}" specification_reference "R 60-3, 2.2.9" }
-      field span_vmin : number { label "Span (v_min)" definition "The span expressed in verification units: span / conversion_factor_f." unit "v" measurement_method derived derivation "ocl{span / conversion_factor_f}" specification_reference "R 60-3, 2.2.9" }
-      field variation : number { label "Variation from first (v_min)" definition "Absolute difference between this measurement's span_vmin and the first measurement's span_vmin." unit "v" measurement_method derived derivation "ocl{abs(span_vmin - measurements[0].span_vmin)}" specification_reference "R 60-1, 5.7.2.6" }
-      field within_limit : boolean { label "Within limit" definition "Evaluation: whether the span variation is within the maximum allowable variation." measurement_method evaluated evaluation { rule "ocl{variation <= max_allowable_variation}" condition "variation <= max(0.5 v_min, 0.5 * |MPE|)" specification_reference "R 60-1, 5.7.2.6" } true_label "Yes" false_label "No" }
+      field avg_dmin : number { label "Average D_min Indication" definition "Mean of all run indications at D_min." unit "counts" measurement_method derived derivation "ocl{mean(readings.dmin->collect(r | r.indication))}" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.2.9" specification_reference "R 60-3, 2.2.9" }
+      field avg_dmax : number { label "Average D_max Indication" definition "Mean of all run indications at D_max." unit "counts" measurement_method derived derivation "ocl{mean(readings.dmax->collect(r | r.indication))}" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.2.9" specification_reference "R 60-3, 2.2.9" }
+      field span : number { label "Span" definition "The difference between average D_max and average D_min indications: avg_dmax - avg_dmin." unit "counts" measurement_method derived derivation "ocl{avg_dmax - avg_dmin}" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.2.9" specification_reference "R 60-3, 2.2.9" }
+      field span_vmin : number { label "Span (v_min)" definition "The span expressed in verification units: span / conversion_factor_f." unit "v" measurement_method derived derivation "ocl{span / conversion_factor_f}" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.2.9" specification_reference "R 60-3, 2.2.9" }
+      field variation : number { label "Variation from first (v_min)" definition "Absolute difference between this measurement's span_vmin and the first measurement's span_vmin." unit "v" measurement_method derived derivation "ocl{abs(span_vmin - measurements[0].span_vmin)}" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-5.7.2.6" specification_reference "R 60-1, 5.7.2.6" }
+      field within_limit : boolean { label "Within limit" definition "Evaluation: whether the span variation is within the maximum allowable variation." measurement_method evaluated evaluation { rule "ocl{variation <= max_allowable_variation}" condition "variation <= max(0.5 v_min, 0.5 * |MPE|)" specification_reference "R 60-1, 5.7.2.6" } true_label "Yes" false_label "No" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-5.7.2.6" }
       field evaluator : string { label "Evaluator" definition "Name of the person who performed this measurement." measurement_method declared }
       field remarks : text { label "Remarks" definition "Free-text notes about this measurement." measurement_method declared }
       field conditions : object {
@@ -9767,8 +9845,8 @@ form r60-3/form-6.19 {
       }
     }
   }
-  field max_allowable_variation : number { label "Maximum Allowable Variation" definition "The maximum permissible span variation: max(0.5 v_min, 0.5 * |MPE|) per R 60-1, 5.7.2.6." unit "v" measurement_method computed derivation "ocl{max(0.5, lookup_mpe(dmax_value, accuracy_class, 1.0) * 0.5)}" specification_reference "R 60-1, 5.7.2.6" }
-  field overall_result : boolean { label "Overall Result" definition "PASS iff every measurement's span variation is within the maximum allowable variation." required true measurement_method evaluated evaluation { rule "ocl{measurements->forAll(m | m.within_limit)}" condition "All variations <= max(0.5 v_min, 0.5 * |MPE|)" specification_reference "R 60-1, 5.7.2.6" } true_label "Pass" false_label "Fail" }
+  field max_allowable_variation : number { label "Maximum Allowable Variation" definition "The maximum permissible span variation: max(0.5 v_min, 0.5 * |MPE|) per R 60-1, 5.7.2.6." unit "v" measurement_method computed derivation "ocl{max(0.5, lookup_mpe(dmax_value, accuracy_class, 1.0) * 0.5)}" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-5.7.2.6" specification_reference "R 60-1, 5.7.2.6" }
+  field overall_result : boolean { label "Overall Result" definition "PASS iff every measurement's span variation is within the maximum allowable variation." required true measurement_method evaluated evaluation { rule "ocl{measurements->forAll(m | m.within_limit)}" condition "All variations <= max(0.5 v_min, 0.5 * |MPE|)" specification_reference "R 60-1, 5.7.2.6" } true_label "Pass" false_label "Fail" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-5.7.2.6" }
   pass_fail {
     criteria "Span variation between any two measurements must not exceed max(0.5 v_min, 0.5 * |MPE|) per R 60-1, 5.7.2.6"
     pass_if "ocl{measurements->forAll(m | m.within_limit)}"
@@ -9787,6 +9865,7 @@ form r60-3/form-6.15 {
   header r60-3/header-a
   section "R 60-3, 6.15"
   requirements { /req/electronic/disturbances }
+  ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.7.7"
   ref requirement "urn:oiml:pub:r:60-1:2021#clause-5.7.2.5"
   ref test-procedure "urn:oiml:pub:r:60-2:2021#clause-2.10.7.7"
   ref calculation "urn:oiml:pub:r:60-3:2021#clause-2.2.5"
@@ -9851,6 +9930,7 @@ form r60-3/table-6.7 {
   header r60-3/header-a
   section "R 60-3, 6.7"
   requirements { /req/metrological/temperature-effect-mdlo }
+  ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.1.16"
   ref requirement "urn:oiml:pub:r:60-1:2021#clause-5.6.1.3"
   ref test-procedure "urn:oiml:pub:r:60-2:2021#clause-2.10.1.16"
   ref calculation "urn:oiml:pub:r:60-3:2021#clause-2.1.4"
@@ -9858,16 +9938,16 @@ form r60-3/table-6.7 {
   ref report-format "urn:oiml:pub:r:60-3:2021#table-5"
   calculation_context { dimensions true }
   conformance_process /conf/metrological-tests/measurement-error-repeatability-mdlo
-  field conversion_factor_f : number { label "Conversion factor (f)" definition "Ratio of indication change to load change at 75% of Max. Converts counts to verification units (v)." unit "counts/v" symbol f bind sample.test_context.conversion_factor_f required true measurement_method computed calculation conversionFactor calculation_bindings { avgIndicationAt75pct: reference_indication_75pct indicationAtDmin: indication_at_dmin n: n_test_intervals} specification_reference "R 60-3, 2.1.2.4" }
+  field conversion_factor_f : number { label "Conversion factor (f)" definition "Ratio of indication change to load change at 75% of Max. Converts counts to verification units (v)." unit "counts/v" symbol f bind sample.test_context.conversion_factor_f required true measurement_method computed calculation conversionFactor calculation_bindings { avgIndicationAt75pct: reference_indication_75pct indicationAtDmin: indication_at_dmin n: n_test_intervals} ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.1.2.4" specification_reference "R 60-3, 2.1.2.4" }
   field reference_indication_75pct : number { label "Reference indication at 75%" definition "Average indication at the 75% load point, used to compute f." unit "counts" required true measurement_method direct }
   field indication_at_dmin : number { label "Indication at D_min" definition "Load cell indication at minimum test load (D_min), used to compute f." unit "counts" required true measurement_method direct }
-  field n_lc : integer { label "Number of verification intervals (n_LC)" definition "Maximum number of load cell verification intervals n_LC, declared by the manufacturer." symbol nLC bind group.parameters.n_lc required true measurement_method declared specification_reference "R 60-1, 3.5.8" }
-  field y : integer { label "Relative v_min (Y)" definition "Ratio of the maximum measuring range to v_min (Y = (E_max - E_min)/v_min)." symbol Y bind group.parameters.y measurement_method declared specification_reference "R 60-1, 3.5.15" }
-  field emax : number { label "Maximum capacity (E_max)" definition "Maximum capacity of the load cell." unit "g, kg, or t" symbol Emax bind model.parameters.e_max required true measurement_method declared specification_reference "R 60-1, 3.5.5" }
-  field emin : number { label "Minimum dead load (E_min)" definition "Minimum dead load of the load cell." unit "g, kg, or t" symbol Emin bind family.parameters.e_min measurement_method declared specification_reference "R 60-1, 3.5.9" }
-  field vmin : number { label "Minimum verification interval (v_min)" definition "Minimum load cell verification interval." unit "g, kg, or t" symbol vmin bind group.parameters.v_min required true measurement_method declared specification_reference "R 60-1, 3.5.11" }
-  field n_test_intervals : number { label "Verification intervals of the tested range (n)" definition "Number of verification intervals of the measuring range under test — (E_max − E_min)/v_min when the test spans the classified range (R 60-3, 2.1.2.4). Input n of the conversion-factor calculation." symbol n measurement_method derived derivation "ocl{(emax - emin) / vmin}" specification_reference "R 60-3, 2.1.2.4" }
-  field plc : number { label "Apportionment factor (p_LC)" definition "Apportionment factor. Also serves as the maximum permissible change (MPC) per temperature increment." symbol pLC bind family.parameters.p_lc measurement_method declared default 0.7 specification_reference "R 60-1, 3.7.2" }
+  field n_lc : integer { label "Number of verification intervals (n_LC)" definition "Maximum number of load cell verification intervals n_LC, declared by the manufacturer." symbol nLC bind group.parameters.n_lc required true measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.8" specification_reference "R 60-1, 3.5.8" }
+  field y : integer { label "Relative v_min (Y)" definition "Ratio of the maximum measuring range to v_min (Y = (E_max - E_min)/v_min)." symbol Y bind group.parameters.y measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.15" specification_reference "R 60-1, 3.5.15" }
+  field emax : number { label "Maximum capacity (E_max)" definition "Maximum capacity of the load cell." unit "g, kg, or t" symbol Emax bind model.parameters.e_max required true measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.5" specification_reference "R 60-1, 3.5.5" }
+  field emin : number { label "Minimum dead load (E_min)" definition "Minimum dead load of the load cell." unit "g, kg, or t" symbol Emin bind family.parameters.e_min measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.9" specification_reference "R 60-1, 3.5.9" }
+  field vmin : number { label "Minimum verification interval (v_min)" definition "Minimum load cell verification interval." unit "g, kg, or t" symbol vmin bind group.parameters.v_min required true measurement_method declared ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.5.11" specification_reference "R 60-1, 3.5.11" }
+  field n_test_intervals : number { label "Verification intervals of the tested range (n)" definition "Number of verification intervals of the measuring range under test — (E_max − E_min)/v_min when the test spans the classified range (R 60-3, 2.1.2.4). Input n of the conversion-factor calculation." symbol n measurement_method derived derivation "ocl{(emax - emin) / vmin}" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.1.2.4" specification_reference "R 60-3, 2.1.2.4" }
+  field plc : number { label "Apportionment factor (p_LC)" definition "Apportionment factor. Also serves as the maximum permissible change (MPC) per temperature increment." symbol pLC bind family.parameters.p_lc measurement_method declared default 0.7 ref derives-from "urn:oiml:pub:r:60-1:2021#clause-3.7.2" specification_reference "R 60-1, 3.7.2" }
   field temperature_readings : array {
     label "Temperature readings"
     definition "Minimum dead load output indication at each test temperature. Four temperatures per R 60-2: 20°C, T_1, T_2, 20°C (return)."
@@ -9877,14 +9957,14 @@ form r60-3/table-6.7 {
     fields {
       field temperature : number { label "Temperature" definition "Ambient temperature at which the MDLO indication is recorded." unit "degC" required true measurement_method direct }
       field indication : number { label "Indication" definition "Average initial minimum test load indication at this temperature, obtained from the load test data (Table 6.3/6.4)." unit "counts" required true measurement_method direct }
-      field change_v : number { label "Change (v)" definition "Change in MDLO indication from the prior temperature, divided by the conversion factor, in verification units." unit "v" symbol CM measurement_method derived derivation "ocl{if $index = 0 then 0 else (indication - $prev.indication) / conversion_factor_f endif}" specification_reference "R 60-3, 2.1.4" }
-      field delta_t : number { label "Temperature step (ΔT)" definition "Temperature span of this step (T_2 − T_1). The baseline row carries 1 °C — inert, since its C_M is 0 — so the canonical verdict derivation is defined on every row." unit "degC" symbol delta_t measurement_method derived derivation "ocl{if $index = 0 then 1 else abs(temperature - $prev.temperature) endif}" specification_reference "R 60-3, 2.1.4" }
-      field change_per_5deg : number { label "Change per temperature increment" definition "Temperature-induced MDLO change normalized by the class increment (5 degC for classes B/C/D, 2 degC for class A) and converted to v_min units — the canonical mdlo_normalized verdict quantity." unit "v" symbol CM-vmin verdict mdlo_normalized measurement_method derived specification_reference "R 60-3, 2.1.4" }
-      field mpc : number { label "MPC" definition "Maximum permissible change per 5 degC (classes B/C/D) or per 2 degC (class A). Equal to p_LC." unit "v" measurement_method declared derivation "ocl{$context.p_LC}" specification_reference "R 60-1, 5.6.1.3" }
-      field within_mpc : boolean { label "Within MPC" definition "Evaluation: whether the normalized temperature-induced change is within the MPC." measurement_method evaluated evaluation { rule "" verdict mdlo_normalized op lte limit "ocl{p_lc}" condition "|C_M(v_min)| per temperature increment <= p_LC" specification_reference "R 60-1, 5.6.1.3" } true_label "Yes" false_label "No" }
+      field change_v : number { label "Change (v)" definition "Change in MDLO indication from the prior temperature, divided by the conversion factor, in verification units." unit "v" symbol CM measurement_method derived derivation "ocl{if $index = 0 then 0 else (indication - $prev.indication) / conversion_factor_f endif}" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.1.4" specification_reference "R 60-3, 2.1.4" }
+      field delta_t : number { label "Temperature step (ΔT)" definition "Temperature span of this step (T_2 − T_1). The baseline row carries 1 °C — inert, since its C_M is 0 — so the canonical verdict derivation is defined on every row." unit "degC" symbol delta_t measurement_method derived derivation "ocl{if $index = 0 then 1 else abs(temperature - $prev.temperature) endif}" ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.1.4" specification_reference "R 60-3, 2.1.4" }
+      field change_per_5deg : number { label "Change per temperature increment" definition "Temperature-induced MDLO change normalized by the class increment (5 degC for classes B/C/D, 2 degC for class A) and converted to v_min units — the canonical mdlo_normalized verdict quantity." unit "v" symbol CM-vmin verdict mdlo_normalized measurement_method derived ref derives-from "urn:oiml:pub:r:60-3:2021#clause-2.1.4" specification_reference "R 60-3, 2.1.4" }
+      field mpc : number { label "MPC" definition "Maximum permissible change per 5 degC (classes B/C/D) or per 2 degC (class A). Equal to p_LC." unit "v" measurement_method declared derivation "ocl{$context.p_LC}" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-5.6.1.3" specification_reference "R 60-1, 5.6.1.3" }
+      field within_mpc : boolean { label "Within MPC" definition "Evaluation: whether the normalized temperature-induced change is within the MPC." measurement_method evaluated evaluation { rule "" verdict mdlo_normalized op lte limit "ocl{p_lc}" condition "|C_M(v_min)| per temperature increment <= p_LC" specification_reference "R 60-1, 5.6.1.3" } true_label "Yes" false_label "No" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-5.6.1.3" }
     }
   }
-  field overall_result : boolean { label "Overall result" definition "PASS iff all temperature-induced MDLO changes are within MPC." required true measurement_method evaluated evaluation { rule "ocl{temperature_readings->forAll(r | r.within_mpc)}" condition "All |C_M| per 5 degC <= p_LC" specification_reference "R 60-1, 5.6.1.3" } true_label "Pass" false_label "Fail" }
+  field overall_result : boolean { label "Overall result" definition "PASS iff all temperature-induced MDLO changes are within MPC." required true measurement_method evaluated evaluation { rule "ocl{temperature_readings->forAll(r | r.within_mpc)}" condition "All |C_M| per 5 degC <= p_LC" specification_reference "R 60-1, 5.6.1.3" } true_label "Pass" false_label "Fail" ref derives-from "urn:oiml:pub:r:60-1:2021#clause-5.6.1.3" }
   pass_fail { criteria "C_M(v) per 5 degC <= p_LC for classes B/C/D; per 2 degC for class A" pass_if "ocl{temperature_readings->forAll(r | r.within_mpc)}" }
 }
 form r60-3/form-6.11 {
@@ -9894,6 +9974,7 @@ form r60-3/form-6.11 {
   header r60-3/header-b
   section "R 60-3, 6.11"
   requirements { /req/electronic/warm-up-time }
+  ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.7.3"
   ref requirement "urn:oiml:pub:r:60-1:2021#clause-5.7.2.1"
   ref test-procedure "urn:oiml:pub:r:60-2:2021#clause-2.10.7.3"
   ref calculation "urn:oiml:pub:r:60-3:2021#clause-2.2.1"
@@ -11602,6 +11683,20 @@ predicate test-procedure {
   target_kinds { document-anchor }
   resolution must-resolve
 }
+predicate method {
+  kind citation
+  description "The external-standard method element the subject applies or binds (TODO.external-refs/09): the target names the procedure or severity entity in its package as <package-id>#<entity-id> — the IEC package owns the method, the consuming Recommendation owns the severities' application and the acceptance expressions (REC-WINS layering). A dangling target fails the build, never renders."
+  subject_kinds { behavior conformance_test }
+  target_kinds { model-element }
+  resolution must-resolve
+}
+predicate guidance {
+  kind citation
+  description "The guidance model the subject rides as guidance (TODO.external-refs/09): the target names the guidance entity in its package as <package-id>#<entity-id> — cited guidance, never a second procedure (the R 60-2, 2.10.5 pattern: IEC 60068-3-4 applies alongside the Test Db procedure, it is not the method)."
+  subject_kinds { behavior conformance_test }
+  target_kinds { model-element }
+  resolution must-resolve
+}
 predicate calculation {
   kind citation
   description "The computation procedure the element realizes (R 60-3's 2.1.x procedures)."
@@ -11779,21 +11874,22 @@ state_machine Application {
   }
   transition DRAFT -> SUBMITTED action submit {
   }
-  transition SUBMITTED -> SAMPLES_REQUESTED action ia_requests_samples {
-  }
-  transition SAMPLES_REQUESTED -> SAMPLES_RECEIVED action ia_logs_samples {
-  }
-  transition SAMPLES_RECEIVED -> UNDER_REVIEW action ia_starts_review {
+  transition SUBMITTED -> UNDER_REVIEW action ia_starts_review {
   }
   transition UNDER_REVIEW -> ACCEPTED action ia_accepts {
   }
   transition UNDER_REVIEW -> REJECTED action ia_rejects {
   }
-  transition [SUBMITTED, SAMPLES_REQUESTED, SAMPLES_RECEIVED, UNDER_REVIEW] -> CHANGES_REQUESTED action ia_requests_changes {
+  transition [SUBMITTED, UNDER_REVIEW] -> CHANGES_REQUESTED action ia_requests_changes {
   }
   transition CHANGES_REQUESTED -> UNDER_REVIEW action applicant_resubmits {
   }
-  transition [SUBMITTED, SAMPLES_REQUESTED, SAMPLES_RECEIVED, UNDER_REVIEW, CHANGES_REQUESTED] -> WITHDRAWN action applicant_withdraws {
+  transition [SUBMITTED, UNDER_REVIEW, CHANGES_REQUESTED] -> WITHDRAWN action applicant_withdraws {
+  }
+  transition ACCEPTED -> SAMPLES_REQUESTED action ia_requests_samples {
+  }
+  transition SAMPLES_REQUESTED -> SAMPLES_RECEIVED action ia_logs_samples {
+    guard "receipt_complete"
   }
   transition DRAFT -> ACCEPTED action register_offline {
     cascade Application {
@@ -16715,6 +16811,7 @@ behavior humidity-cyclic-response {
   stimulus relative_humidity
   response "Change in load cell output due to exposure to cyclic damp heat (CH class or unmarked load cells), bounded at the minimum load and at the maximum load (applying IEC 60068-2-30)."
   ref derives-from "urn:oiml:pub:r:60-1:2021#clause-5.6.3"
+  ref method "iec-60068-2-30#test-procedure-damp-heat-cyclic"
   verified_by { /conf/metrological-tests/humidity-ch }
 }
 behavior humidity-steady-response {
@@ -16722,6 +16819,7 @@ behavior humidity-steady-response {
   stimulus relative_humidity
   response "Change in load cell output due to exposure to steady-state damp heat (SH-marked load cells), bounded by the maximum permissible error for the applied load (applying IEC 60068-2-78)."
   ref derives-from "urn:oiml:pub:r:60-1:2021#clause-5.6.3"
+  ref method "iec-60068-2-78#test-procedure-damp-heat-steady-state"
   verified_by { /conf/metrological-tests/humidity-sh }
 }
 behavior response-to-bursts {
@@ -16729,6 +16827,7 @@ behavior response-to-bursts {
   stimulus electrical_fast_transient
   response "Change in load cell output due to electrical fast transients (bursts) applied to power supply lines and I/O circuits — the fault against the output without disturbance stays within the significant-fault criterion (applying IEC 61000-4-4)."
   ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.7.6"
+  ref method "iec-61000-4-4#test-procedure-eft-burst"
   verified_by { /conf/electronic-tests/bursts }
 }
 behavior response-to-surges {
@@ -16736,6 +16835,7 @@ behavior response-to-surges {
   stimulus surge
   response "Change in load cell output due to surge events applied to power supply lines, line-to-line and line-to-earth — the fault against the output without disturbance stays within the significant-fault criterion (applying IEC 61000-4-5)."
   ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.7.7"
+  ref method "iec-61000-4-5#test-procedure-surge"
   verified_by { /conf/electronic-tests/surge }
 }
 behavior response-to-esd {
@@ -16743,6 +16843,7 @@ behavior response-to-esd {
   stimulus electrostatic_discharge
   response "Change in load cell output due to electrostatic discharge, contact and air application — the fault against the output without disturbance stays within the significant-fault criterion (applying IEC 61000-4-2)."
   ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.7.8"
+  ref method "iec-61000-4-2#test-procedure-esd"
   verified_by { /conf/electronic-tests/esd }
 }
 behavior response-to-rf-em-fields {
@@ -16750,6 +16851,7 @@ behavior response-to-rf-em-fields {
   stimulus em_field
   response "Change in load cell output due to radiated and conducted radio-frequency electromagnetic fields — the fault against the output without disturbance stays within the significant-fault criterion (applying IEC 61000-4-3 and IEC 61000-4-6)."
   ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.7.9"
+  ref method "iec-61000-4-3#test-procedure-radiated-rf"
   verified_by { /conf/electronic-tests/emc-susceptibility /conf/electronic-tests/conducted-emc }
 }
 behavior response-to-power-voltage-variation {
@@ -18883,6 +18985,71 @@ conformance_test /conf/metrological-tests/measurement-error-repeatability-mdlo {
     5 "Apply test loads at 20°C return; calculate MDLO changes" outputs { e_l e_r mpe c_m }
   }
   procedure_steps { check_test_conditions insert_load_cell preload_load_cell check_indicating_instrument monitor_load_cell record_initial_indication apply_test_load_points apply_increasing_loads record_indications_increasing decrease_test_loads record_indications_decreasing repeat_per_accuracy_class repeat_per_temperature determine_measurement_error determine_repeatability_error determine_temperature_effect_mdlo }
+  preparation {
+    description "Test-conditions review, insertion and thermal stabilisation at the 20 °C reference, the threefold D_max preload with its 5-minute wait, the indicating-instrument check, and the stabilised minimum-test-load reading that baselines every later D_min reading of the run (the MDLO reference)"
+    step 1 { action "Review the test conditions of 2.7.3, insert the load cell into the force-generating system, load to the minimum test load D_min, and stabilise at 20 °C ± 2 °C" drive ladApply args { loadKg: "e_min" } hold 30min verify { read applied_load tolerance /req/metrological/measuring-range-min } }
+    step 2 { action "Preload the load cell by applying the maximum test load D_max three times, returning to D_min after each application, then wait 5 minutes before commencing further tests" drive ladApply args { loadKg: "e_max" repetitions: "3" returnToKg: "e_min" } hold 5min verify { read applied_load tolerance /req/metrological/measuring-range-max } }
+    step 3 { action "Check the indicating instrument according to 2.7.3.10" }
+    step 4 { action "Monitor the minimum test load output until stable, then record the indicating instrument indication at D_min — the run's MDLO baseline" }
+    ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.1.1"
+    ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.1.2"
+    ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.1.3"
+    ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.1.4"
+    ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.1.5"
+    ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.1.6"
+  }
+  stimulus {
+    description "One full run of the load test over the four temperature plateaus of 2.10.1.13 — 20 °C reference (stabilised by the preparation), T_high, T_low, 20 °C return — each plateau sweeping the five ascending load points over e_max fractions (at or near the Table 4 MPE changes where they fall, 2.10.1.8) and decreasing over the same points to D_min (2.10.1.10), the plateau's closing D_min reading feeding the temperature-effect-on-MDLO criterion. Points equally time-spaced per 2.10.1.7 with the Table 1 loading/stabilisation discipline of 2.8.3. The program is ONE run: the class repetitions of 2.10.1.12 (5 runs classes A/B, 3 runs classes C/D) ride the test's instances block (n_runs), and the plateau ordering IS the test_sequence temperature-cycling — that construct orders phases and cannot carry drives, so the executable environment program lives here."
+    point 1 { drive ladApply args { loadKg: "0.1 * e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 2 { drive ladApply args { loadKg: "0.2 * e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 3 { drive ladApply args { loadKg: "0.4 * e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 4 { drive ladApply args { loadKg: "0.6 * e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 5 { drive ladApply args { loadKg: "e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 6 { drive ladApply args { loadKg: "0.6 * e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 7 { drive ladApply args { loadKg: "0.4 * e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 8 { drive ladApply args { loadKg: "0.2 * e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 9 { drive ladApply args { loadKg: "0.1 * e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 10 { drive ladRelease hold PT1M fresh_within 5s acceptance /req/metrological/temperature-effect-mdlo }
+    point 11 { drive chamberSet args { temperatureDegC: "t_max" } hold 30min fresh_within 5s acceptance /req/metrological/temperature-limits }
+    point 12 { drive ladApply args { loadKg: "0.1 * e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 13 { drive ladApply args { loadKg: "0.2 * e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 14 { drive ladApply args { loadKg: "0.4 * e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 15 { drive ladApply args { loadKg: "0.6 * e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 16 { drive ladApply args { loadKg: "e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 17 { drive ladApply args { loadKg: "0.6 * e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 18 { drive ladApply args { loadKg: "0.4 * e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 19 { drive ladApply args { loadKg: "0.2 * e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 20 { drive ladApply args { loadKg: "0.1 * e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 21 { drive ladRelease hold PT1M fresh_within 5s acceptance /req/metrological/temperature-effect-mdlo }
+    point 22 { drive chamberSet args { temperatureDegC: "t_min" } hold 30min fresh_within 5s acceptance /req/metrological/temperature-limits }
+    point 23 { drive ladApply args { loadKg: "0.1 * e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 24 { drive ladApply args { loadKg: "0.2 * e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 25 { drive ladApply args { loadKg: "0.4 * e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 26 { drive ladApply args { loadKg: "0.6 * e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 27 { drive ladApply args { loadKg: "e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 28 { drive ladApply args { loadKg: "0.6 * e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 29 { drive ladApply args { loadKg: "0.4 * e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 30 { drive ladApply args { loadKg: "0.2 * e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 31 { drive ladApply args { loadKg: "0.1 * e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 32 { drive ladRelease hold PT1M fresh_within 5s acceptance /req/metrological/temperature-effect-mdlo }
+    point 33 { drive chamberSet args { temperatureDegC: "20" } hold 30min fresh_within 5s acceptance /req/metrological/temperature-limits }
+    point 34 { drive ladApply args { loadKg: "0.1 * e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 35 { drive ladApply args { loadKg: "0.2 * e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 36 { drive ladApply args { loadKg: "0.4 * e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 37 { drive ladApply args { loadKg: "0.6 * e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 38 { drive ladApply args { loadKg: "e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 39 { drive ladApply args { loadKg: "0.6 * e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 40 { drive ladApply args { loadKg: "0.4 * e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 41 { drive ladApply args { loadKg: "0.2 * e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 42 { drive ladApply args { loadKg: "0.1 * e_max" } hold PT1M fresh_within 5s acceptance /req/metrological/mpe }
+    point 43 { drive ladRelease hold PT1M fresh_within 5s acceptance /req/metrological/temperature-effect-mdlo }
+    ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.1.7"
+    ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.1.8"
+    ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.1.9"
+    ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.1.10"
+    ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.1.11"
+    ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.1.13"
+  }
   kind performance
   variables {
     variable n { type integer source derived derivation "ocl{(e_max - e_min) / v_min}" description "Verification intervals of the measuring range under test (= Y when the test spans the classified range, R 60-3, 2.1.2.4)" }
@@ -18959,6 +19126,41 @@ conformance_test /conf/metrological-tests/creep {
     5 "Remove load, return to D_min"
   }
   procedure_steps { check_test_conditions insert_load_cell preload_load_cell check_indicating_instrument monitor_load_cell record_initial_indication apply_load_dmax record_indications_30min repeat_per_temperature determine_creep_error }
+  preparation {
+    description "Test-conditions review, insertion and thermal stabilisation at the 20 °C reference, the threefold D_max preload with its one-hour wait (the creep preload discipline is stricter than the load test's 5 minutes), the indicating-instrument check, and the stabilised D_min reading that doubles as the DR test's initial reading (2.9.2)"
+    step 1 { action "Review the test conditions of 2.7.3, insert the load cell into the force-generating system, load to the minimum test load D_min, and stabilise at 20 °C ± 2 °C" drive ladApply args { loadKg: "e_min" } hold 30min verify { read applied_load tolerance /req/metrological/measuring-range-min } }
+    step 2 { action "Preload the load cell by applying the maximum test load D_max three times, returning to D_min after each application, then wait one hour" drive ladApply args { loadKg: "sample.test_context.d_max" repetitions: "3" returnToKg: "e_min" } hold 1h verify { read applied_load tolerance /req/metrological/measuring-range-max } }
+    step 3 { action "Check the indicating instrument according to 2.7.3.10" }
+    step 4 { action "Monitor the minimum test load output until stable, then record the indicating instrument indication at D_min — the DR baseline of 2.9.2" }
+    ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.2.1"
+    ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.2.2"
+    ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.2.3"
+    ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.2.4"
+    ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.2.5"
+    ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.2.6"
+  }
+  stimulus {
+    description "The 30-minute D_max hold at each test temperature (2.10.2.9: 20 °C reference first, then T_high, then T_low — the preload discipline of 2.10.2.3 repeats per plateau). Per plateau: apply the constant D_max (90–100 % of E_max, 2.10.2.7), read the initial indication as soon as the Table 1 interval allows (2.10.2.8, 2.8.3 — no hold on the t=0 point), then the mandated 20-minute and closing 30-minute readings (the run records periodically at its own cadence between them, 2.10.2.8), and release to D_min — the release reading chains the DR test (2.9.2). The 20-minute point is judged against the 20–30-minute creep band, the 30-minute point against the 30-minute creep limit."
+    point 1 { drive ladApply args { loadKg: "sample.test_context.d_max" } fresh_within 30s acceptance /req/metrological/creep }
+    point 2 { drive advanceTime args { seconds: "1200" } fresh_within 5s acceptance /req/metrological/creep-20-30 }
+    point 3 { drive advanceTime args { seconds: "600" } fresh_within 5s acceptance /req/metrological/creep }
+    point 4 { drive ladRelease hold PT1M fresh_within 5s acceptance /req/metrological/dr }
+    point 5 { drive chamberSet args { temperatureDegC: "t_max" } hold 30min fresh_within 5s acceptance /req/metrological/temperature-limits }
+    point 6 { drive ladApply args { loadKg: "sample.test_context.d_max" repetitions: "3" returnToKg: "e_min" } hold 1h fresh_within 5s acceptance /req/metrological/measuring-range-max }
+    point 7 { drive ladApply args { loadKg: "sample.test_context.d_max" } fresh_within 30s acceptance /req/metrological/creep }
+    point 8 { drive advanceTime args { seconds: "1200" } fresh_within 5s acceptance /req/metrological/creep-20-30 }
+    point 9 { drive advanceTime args { seconds: "600" } fresh_within 5s acceptance /req/metrological/creep }
+    point 10 { drive ladRelease hold PT1M fresh_within 5s acceptance /req/metrological/dr }
+    point 11 { drive chamberSet args { temperatureDegC: "t_min" } hold 30min fresh_within 5s acceptance /req/metrological/temperature-limits }
+    point 12 { drive ladApply args { loadKg: "sample.test_context.d_max" repetitions: "3" returnToKg: "e_min" } hold 1h fresh_within 5s acceptance /req/metrological/measuring-range-max }
+    point 13 { drive ladApply args { loadKg: "sample.test_context.d_max" } fresh_within 30s acceptance /req/metrological/creep }
+    point 14 { drive advanceTime args { seconds: "1200" } fresh_within 5s acceptance /req/metrological/creep-20-30 }
+    point 15 { drive advanceTime args { seconds: "600" } fresh_within 5s acceptance /req/metrological/creep }
+    point 16 { drive ladRelease hold PT1M fresh_within 5s acceptance /req/metrological/dr }
+    ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.2.7"
+    ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.2.8"
+    ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.2.9"
+  }
   kind performance
   variables {
     variable d_max { type number unit "g, kg, or t" source declared description "Maximum test load, 90-100% of E_max" }
@@ -19149,6 +19351,9 @@ conformance_test /conf/metrological-tests/humidity-ch {
   ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.5.13"
   ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.5.14"
   ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.5.15"
+  ref method "iec-60068-2-30#test-procedure-damp-heat-cyclic" { note "The method the CH test applies: Test Db with variant 2 on the temperature fall (R 60-2, 2.10.5, applying IEC 60068-2-30 Ed. 3.0 (2005-08)) — the procedure is the IEC package's; the severities' application and the acceptance expressions stay with this Recommendation (REC-WINS)." }
+  ref method "iec-60068-2-30#severity-db-40-degc" { note "Severity binding: clause 6 option a) — the upper temperature 40 °C of the 25 °C ↔ 40 °C cycle — with the cycle count pinned to 12 of the option-a menu (12 temperature cycles of 24 h each, RH 80 % – 96 %, condensation expected during the temperature rise — R 60-2, 2.10.5)." }
+  ref guidance "iec-60068-3-4#guidance-damp-heat" { note "The damp-heat guidance rides as guidance (R 60-2, 2.10.5, Applicable standards) — the guidance model, never a second procedure." }
   targets {
     /req/metrological/humidity-ch
   }
@@ -19228,6 +19433,9 @@ conformance_test /conf/metrological-tests/humidity-sh {
   ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.6.11/table-1"
   ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.6.12"
   ref derives-from "urn:oiml:pub:r:60-2:2021#clause-2.10.6.13"
+  ref method "iec-60068-2-78#test-procedure-damp-heat-steady-state" { note "The method the SH test applies: Test Cab (R 60-2, 2.10.6, applying IEC 60068-2-78) — the procedure is the IEC package's; the acceptance expressions stay with this Recommendation (REC-WINS)." }
+  ref method "iec-60068-2-78#severity-cab-40-degc-85-rh" { note "Severity binding: Table 1 combination 4 — (40 ± 2) °C with (85 ± 3) % RH; R 60 pins the humidity at 85 % and the temperature at the high end of the R 60-1, 5.6.1 range (40 °C under the standard limits; a special-limits class per 5.6.1.2 binds the combination matching its actual range)." }
+  ref method "iec-60068-2-78#severity-cab-durations" { note "Duration binding: 48 h — 2 days of the preferred-duration menu, counted from temperature and humidity stabilisation (R 60-2, 2.10.6)." }
   targets {
     /req/metrological/humidity-sh
   }
@@ -19275,6 +19483,7 @@ conformance_test /conf/metrological-tests/humidity-sh {
     specimens { count 1 continuity same_eut rules { unit-continuity } }
   }
   result_forms { humidity-sh }
+  source_discrepancy { summary "R 60-2, 2.10.6 applies IEC 60068-2-78 and the R 60 bibliography cites the 2012 rolling published version (RLV) of that standard, but the available source tree is the 2001 edition, which the iec-60068-2-78 package models — the method and severity bindings above target the 2001 edition's entities and URNs" sources { "urn:iec:std:iec:60068-2-78:2012" "urn:iec:std:iec:60068-2-78:2001" } resolution annotated_only rationale "Recorded, never a silent substitution: the package models the 2001 text (the edition the extracted sources carry — iec-60068-2-78/sources/iec-60068-2-78-2001, 14 sections) and every binding carries its 2001 URN; the 2012 RLV cite rides the R 60 bibliography (af-bibliography.adoc) only. The edition gap stays audit-visible here instead of hiding in a substitution. See TODO.external-refs/09." }
 }
 lab_selection_criterion accreditation-scope {
   weight required
